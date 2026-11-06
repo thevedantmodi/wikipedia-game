@@ -677,7 +677,7 @@ function renderArticle(data) {
 //    in the text flow instead. Nothing is moved in the DOM and the infobox is
 //    left alone; clearing below the floats is only a last resort, since it
 //    leaves an empty column beside them.
-const PICTURE_FLOATS = 'figure, div.thumb, .tright, .tleft, .floatright, .floatleft';
+const PICTURE_FLOATS = 'figure, div.thumb:not(.gallerybox *), .tright, .tleft, .floatright, .floatleft';
 
 function isSqueezed(t, full) {
   return t.scrollWidth > t.clientWidth + 1 && t.offsetWidth < full - 1;
