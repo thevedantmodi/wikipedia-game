@@ -740,6 +740,11 @@ body.is-host .guest-only { display: none !important; }
   max-width: 100%;
 }
 .article-body .wikitable th, .article-body .wikitable td { border: 1px solid var(--border-strong); padding: 0.3em 0.5em; }
+/* The table element itself is a full-width scroll box (display:block), so keep its own
+   border/background off and let the cells draw the table; otherwise the frame runs
+   past the last column. */
+.article-body .wikitable { border: 0; background: transparent; }
+.article-body .wikitable td { background: var(--panel-2); }
 .article-body .wikitable th { background: var(--chip); }
 .article-body .infobox {
   float: right;
@@ -1132,4 +1137,38 @@ body.is-racing .article-body :is(h2, h3)[id] { scroll-margin-top: 12px; }
   /* Keep the help button on the same row as the route. */
   .race-bar { column-gap: 12px; }
   .race-route { flex-basis: calc(100% - 48px); }
+}
+
+/* ---- multiple-image boxes ({{multiple image}}, class "tmulti") ----
+   Their HTML hard-codes the width of the whole row (often 800px+), which
+   overflowed the 300px cap on .thumb and spilled out of the article card.
+   Let them use up to the article's width; Wikipedia's own template styles
+   then wrap the pictures onto more rows when they don't fit. */
+.article-body .thumb.tmulti { max-width: 100%; }
+.article-body .tmulti .thumbinner { width: auto !important; max-width: 100% !important; }
+.article-body .tmulti .tsingle { max-width: 100%; }
+
+/* ---- picture boxes keep their real size, up to the article width ----
+   Many boxes (location maps, panoramas, galleries) hard-code a width larger
+   than the old 300px cap and spilled out of it. Inner fixed-width containers
+   shrink with the box; map labels are positioned in %, so they follow. */
+.article-body figure, .article-body .thumb { max-width: 100%; }
+.article-body .thumbinner div[style*="width"] { max-width: 100%; }
+/* Set by fitTables() for floats wider than ~60% of the article. */
+.article-body .wide-float {
+  float: none !important;
+  display: flow-root;
+  width: fit-content;
+  max-width: 100%;
+  margin: 1em auto !important;
+}
+/* Location-map labels: keep them on one line (Wikipedia does the same), or
+   labels placed left of their dot get squeezed to one letter per line. */
+.article-body .locmap .od { white-space: nowrap; }
+/* Set by fitTables() on pictures beside a table that would otherwise be squeezed. */
+.article-body .unfloated {
+  float: none !important;
+  display: inline-block;
+  vertical-align: top;
+  margin: 0.5em 0.8em 0.8em 0 !important;
 }
