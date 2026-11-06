@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Room, COUNTDOWN_MS, serializeRoom, deserializeRoom } from '../lib/game.js';
+import { Room, COUNTDOWN_MS, FINISH_GRACE_MS, serializeRoom, deserializeRoom } from '../lib/game.js';
 import { normalizeTitle } from '../lib/wiki.js';
 import { fakeWiki } from './helpers.js';
 
@@ -216,4 +216,46 @@ test('reaching United States alerts everyone except the player who got there', a
   await restored.move(b.id, 'USA');
   assert.ok(restored.alerts.at(-1).id > forB[0].id);
   assert.equal(restored.viewFor(a.id).alerts.length, 1);
+});
+
+test('fastest-time races end 2 minutes after the first finish', async () => {
+  const { room, players, begin, advance } = setup({ settings: { mode: 'time' }, players: 3 });
+  await begin();
+  const [a, b, c] = players;
+  await room.move(a.id, 'France');
+  await room.move(a.id, 'Napoleon');
+  assert.equal(room.endsAt, room.now() + FINISH_GRACE_MS);
+
+  // A second finisher doesn't push the deadline back
+  advance(30_000);
+  const deadline = room.endsAt;
+  await room.move(b.id, 'France');
+  await room.move(b.id, 'Napoleon');
+  assert.equal(room.endsAt, deadline);
+
+  advance(FINISH_GRACE_MS - 30_000 - 1);
+  room.tick();
+  assert.equal(room.state, 'racing');
+  advance(1);
+  room.tick();
+  assert.equal(room.state, 'finished');
+  assert.equal(c.status, 'dnf');
+});
+
+test('the 2-minute cutoff never extends a shorter time limit', async () => {
+  const { room, players, begin, advance } = setup({ settings: { mode: 'time', timeLimitMin: 1 } });
+  await begin();
+  const limit = room.endsAt;
+  advance(30_000);
+  await room.move(players[0].id, 'France');
+  await room.move(players[0].id, 'Napoleon');
+  assert.equal(room.endsAt, limit);
+});
+
+test('fewest-clicks races keep going after the first finish', async () => {
+  const { room, players, begin } = setup({ settings: { mode: 'clicks' } });
+  await begin();
+  await room.move(players[0].id, 'France');
+  await room.move(players[0].id, 'Napoleon');
+  assert.equal(room.endsAt, null);
 });

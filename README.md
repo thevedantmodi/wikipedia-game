@@ -26,7 +26,7 @@ Without Redis, a deployment falls back to in-memory rooms. Those break as soon a
 1. Someone creates a room and shares the 4-letter code or the invite link.
 2. The host picks a start and a target. They can type titles or press 🎲 to get a random pair, drawn either from well-known articles or from any article.
 3. The host sets the rules:
-   - **Winner:** fastest time (the default) or fewest clicks.
+   - **Winner:** fastest time (the default) or fewest clicks. In fastest-time races, everyone else gets 2 more minutes once the first player finishes.
    - **Click limit** and **time limit**.
    - **Back button:** allowed or not. Each back costs a click.
    - **Show opponents' pages live:** if this is off, you only see opponents' click counts until the race ends.

@@ -330,7 +330,11 @@ function announce(next) {
     for (const p of next.players) {
       const before = prevStatuses.get(p.id);
       if (before === 'racing' && p.status === 'finished' && p.id !== next.you) {
-        toast(`🎉 ${p.name} reached the target in ${p.clicks} clicks!`);
+        const closing =
+          next.settings.mode === 'time' && next.endsAt && !state.endsAt && me()?.status === 'racing'
+            ? ` The race ends in ${formatMs(next.endsAt - serverNow())}!`
+            : '';
+        toast(`🎉 ${p.name} reached the target in ${p.clicks} clicks!${closing}`);
       }
     }
   }
