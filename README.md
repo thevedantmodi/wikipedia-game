@@ -4,8 +4,9 @@ A multiplayer **WikiRace**. Everyone starts on the same Wikipedia article and ra
 
 ## Where to play
 
-[wikirace.vedantmodi.com](wikirace.vedantmodi.com)
-[wikirace.hannahjiang.com](wikirace.hannahjiang.com)
+[wikirace.vedantmodi.com](https://wikirace.vedantmodi.com/)
+
+[wikirace.hannahjiang.com](https://wikirace.hannahjiang.com/)
 
 ## How it plays
 
