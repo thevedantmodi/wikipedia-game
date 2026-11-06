@@ -663,8 +663,63 @@ function renderArticle(data) {
   if (toc) body.prepend(toc);
   $('#article').replaceChildren(titleEl, body);
   $('.race-body').scrollTop = 0; // the scroll area while racing
+  sizeFigures(body);
+  requestAnimationFrame(fitTables);
   window.scrollTo({ top: 0 });
 }
+
+// Article layout fixes that need measuring, run after each render and resize.
+//  - Boxes wider than most of the article (big maps, panoramas) only leave a
+//    useless sliver beside them when floated, so they're centered instead.
+//  - Tables scroll sideways (display:block + overflow-x), which lets the
+//    browser squeeze them into the room left beside floated pictures, cutting
+//    off columns. The pictures beside a squeezed table stop floating and sit
+//    in the text flow instead. Nothing is moved in the DOM and the infobox is
+//    left alone; clearing below the floats is only a last resort, since it
+//    leaves an empty column beside them.
+const PICTURE_FLOATS = 'figure, div.thumb, .tright, .tleft, .floatright, .floatleft';
+
+function isSqueezed(t, full) {
+  return t.scrollWidth > t.clientWidth + 1 && t.offsetWidth < full - 1;
+}
+
+function fitTables() {
+  const body = document.querySelector('#article .article-body');
+  if (!body) return;
+  for (const el of body.querySelectorAll('.wide-float, .unfloated')) el.classList.remove('wide-float', 'unfloated');
+  for (const t of body.querySelectorAll('table.wikitable')) t.style.clear = '';
+  const full = body.clientWidth;
+
+  for (const el of body.querySelectorAll(PICTURE_FLOATS)) {
+    if (getComputedStyle(el).float !== 'none' && el.offsetWidth > full * 0.6) el.classList.add('wide-float');
+  }
+  for (const t of body.querySelectorAll('table.wikitable')) {
+    if (!isSqueezed(t, full)) continue;
+    const top = t.getBoundingClientRect().top;
+    for (const el of body.querySelectorAll(PICTURE_FLOATS)) {
+      if (
+        !el.contains(t) &&
+        t.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING &&
+        !el.parentElement.closest(PICTURE_FLOATS) &&
+        getComputedStyle(el).float !== 'none' &&
+        el.getBoundingClientRect().bottom > top + 1
+      ) {
+        el.classList.add('unfloated');
+      }
+    }
+    if (isSqueezed(t, full)) t.style.clear = 'both';
+  }
+}
+
+// Size each picture box to its image (from the width attribute) so long
+// captions wrap under the picture instead of stretching or squashing the box.
+function sizeFigures(body) {
+  for (const fig of body.querySelectorAll('figure')) {
+    const w = Number(fig.querySelector('img')?.getAttribute('width'));
+    if (w > 0) fig.style.width = `min(${w + 10}px, 100%)`; // + padding and border
+  }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fitTables));
 
 // Wikipedia-style "Contents" box built from the article's h2/h3 headings.
 // Entries scroll within the page instead of changing the URL hash.
