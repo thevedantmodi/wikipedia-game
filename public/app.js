@@ -238,6 +238,7 @@ function goHome(message) {
 function enterRoom(creds) {
   session = creds;
   state = null;
+  seenAlertId = null;
   history.replaceState(null, '', `/?room=${creds.code}`);
   $('#room-code').textContent = creds.code;
   showScreen('room');
@@ -252,6 +253,7 @@ function applyState(next) {
   if (state && next.version < state.version) return;
   clockOffset = next.serverNow - Date.now();
   announce(next);
+  showAlerts(next.alerts || []);
   state = next;
   render();
 }
@@ -296,12 +298,43 @@ document.addEventListener('visibilitychange', () => {
   else poll();
 });
 
+// Landmark alerts ("Bob reached United States!") from the server. The server
+// already leaves out the viewer's own alerts. On the first state after
+// joining or refreshing, existing alerts are marked seen instead of replayed.
+let seenAlertId = null;
+const ALERT_ICONS = { 'United States': '🇺🇸' };
+
+function showAlerts(alerts) {
+  const newest = Math.max(0, ...alerts.map((a) => a.id));
+  if (seenAlertId == null) {
+    seenAlertId = newest;
+    return;
+  }
+  for (const a of alerts) {
+    if (a.id > seenAlertId) popAlert(`${ALERT_ICONS[a.title] || '📍'} ${a.name} reached ${a.title}!`);
+  }
+  seenAlertId = Math.max(seenAlertId, newest);
+}
+
+function popAlert(text) {
+  const el = h('div', { class: 'alert-pop', role: 'status' }, text);
+  $('#alerts').append(el);
+  setTimeout(() => {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 300);
+  }, 4000);
+}
+
 function announce(next) {
   if (state && state.round === next.round) {
     for (const p of next.players) {
       const before = prevStatuses.get(p.id);
       if (before === 'racing' && p.status === 'finished' && p.id !== next.you) {
-        toast(`🎉 ${p.name} reached the target in ${p.clicks} clicks!`);
+        const closing =
+          next.settings.mode === 'time' && next.endsAt && !state.endsAt && me()?.status === 'racing'
+            ? ` The race ends in ${formatMs(next.endsAt - serverNow())}!`
+            : '';
+        toast(`🎉 ${p.name} reached the target in ${p.clicks} click${p.clicks === 1 ? '' : 's'}!${closing}`);
       }
     }
   }
@@ -596,8 +629,8 @@ function renderArticle(data) {
       }
     }
     if (title && links.has(title) && title !== data.title) {
+      // No special styling for links to the target: spotting it is part of the game.
       a.classList.add('game-link');
-      if (title === state?.target) a.classList.add('is-target');
       a.dataset.title = title;
       a.setAttribute('href', '#');
     } else {
@@ -617,10 +650,60 @@ function renderArticle(data) {
   titleEl.textContent = new DOMParser().parseFromString(data.displayTitle, 'text/html').body.textContent;
   const body = h('div', { class: 'article-body' });
   body.append(...root.childNodes);
-  if (!state.settings.allowFind) hideTextFromFind(titleEl, body);
+  const toc = state.settings.showToc ? buildToc(body) : null;
+  if (!state.settings.allowFind) hideTextFromFind(titleEl, body, ...(toc ? [toc] : []));
+  if (toc) body.prepend(toc);
   $('#article').replaceChildren(titleEl, body);
   $('#article-wrap').scrollTop = 0;
   window.scrollTo({ top: 0 });
+}
+
+// Wikipedia-style "Contents" box built from the article's h2/h3 headings.
+// Entries scroll within the page instead of changing the URL hash.
+function buildToc(body) {
+  const headings = [...body.querySelectorAll('h2[id], h3[id]')];
+  if (headings.length < 2) return null;
+  const list = h('ol', {});
+  let section = 0;
+  let sub = 0;
+  let subList = null;
+  for (const el of headings) {
+    const text = el.textContent.trim();
+    if (!text) continue;
+    const isSub = el.tagName === 'H3' && section > 0;
+    let number;
+    if (isSub) {
+      number = `${section}.${++sub}`;
+    } else {
+      number = String(++section);
+      sub = 0;
+      subList = null;
+    }
+    const item = h('li', {},
+      h('a', { href: `#${el.id}`, class: 'toc-link', 'data-section': el.id },
+        h('span', { class: 'toc-num' }, number),
+        h('span', {}, text),
+      ),
+    );
+    if (isSub) {
+      if (!subList) {
+        subList = h('ol', {});
+        list.lastElementChild.append(subList);
+      }
+      subList.append(item);
+    } else {
+      list.append(item);
+    }
+  }
+  const box = h('details', { class: 'article-toc', open: true }, h('summary', {}, 'Contents'), list);
+  box.addEventListener('click', (e) => {
+    const link = e.target.closest('.toc-link');
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+    document.getElementById(link.dataset.section)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  return box;
 }
 
 // Browsers' find-in-page (including the Edit > Find menu, which can't be

@@ -77,7 +77,7 @@
         <ul>
           <li>Everyone starts on the same article and races to the same target.</li>
           <li>Only links inside the article body work — no search bar, no navboxes.</li>
-          <li><b>Fastest time</b> mode (the default) ranks by time; <b>Fewest clicks</b> mode ranks by clicks.</li>
+          <li><b>Fastest time</b> mode (the default) ranks by time, and the race ends 2 minutes after the first player finishes (right away in a 2-player race). <b>Fewest clicks</b> mode ranks by clicks.</li>
           <li>The host can allow the back button (each back costs a click), set click or time limits, and choose whether opponents' pages are visible live.</li>
           <li>Find-in-page (Ctrl/Cmd+F) is off unless the host turns it on.</li>
           <li>Tip: go broad (countries, centuries, wars), then narrow toward the target's neighbours.</li>
@@ -150,6 +150,7 @@
             <label class="check"><span>Allow back button <span class="muted">(costs a click)</span></span><input type="checkbox" data-setting="allowBack"></label>
             <label class="check"><span>Show opponents' pages live <span class="muted">(off = clicks only)</span></span><input type="checkbox" data-setting="showPaths"></label>
             <label class="check"><span>Allow find-in-page <span class="muted">(Ctrl/Cmd+F)</span></span><input type="checkbox" data-setting="allowFind"></label>
+            <label class="check"><span>Show table of contents</span><input type="checkbox" data-setting="showToc"></label>
           </fieldset>
         </section>
         <aside class="lobby-side">
@@ -231,6 +232,7 @@
     </div>
   </section>
 
+  <div id="alerts" class="alerts" aria-live="polite"></div>
   <div id="toast" class="toast" hidden></div>
   <script type="module" src="/app.js"></script>
 </body>
