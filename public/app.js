@@ -334,7 +334,7 @@ function announce(next) {
           next.settings.mode === 'time' && next.endsAt && !state.endsAt && me()?.status === 'racing'
             ? ` The race ends in ${formatMs(next.endsAt - serverNow())}!`
             : '';
-        toast(`🎉 ${p.name} reached the target in ${p.clicks} clicks!${closing}`);
+        toast(`🎉 ${p.name} reached the target in ${p.clicks} click${p.clicks === 1 ? '' : 's'}!${closing}`);
       }
     }
   }
