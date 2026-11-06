@@ -629,8 +629,8 @@ function renderArticle(data) {
       }
     }
     if (title && links.has(title) && title !== data.title) {
+      // No special styling for links to the target: spotting it is part of the game.
       a.classList.add('game-link');
-      if (title === state?.target) a.classList.add('is-target');
       a.dataset.title = title;
       a.setAttribute('href', '#');
     } else {

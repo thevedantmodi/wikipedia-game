@@ -703,13 +703,6 @@ body.is-host .guest-only { display: none !important; }
 .article-body h4, .article-body h5 { font-size: 1em; font-weight: 700; margin: 1em 0 0.3em; }
 .article-body a { color: var(--accent); text-decoration: none; }
 .article-body a.game-link:hover { color: var(--accent-dark); text-decoration: underline; }
-.article-body a.game-link.is-target {
-  background: var(--target-bg);
-  color: var(--target);
-  font-weight: 700;
-  padding: 0 4px;
-  border-radius: 4px;
-}
 .article-body a.dead-link { color: inherit; cursor: default; }
 .article-body img {
   max-width: 100%;
