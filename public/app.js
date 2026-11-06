@@ -223,6 +223,8 @@ async function joinRoom(code, { silent = false } = {}) {
 }
 
 function goHome(message) {
+  document.body.classList.remove('is-racing');
+  closeHelp();
   clearTimeout(pollTimer);
   clearInterval(tickTimer);
   session = state = localNav = null;
@@ -354,6 +356,12 @@ function isHost() {
 function render() {
   if (!state) return;
   document.body.classList.toggle('is-host', isHost());
+  // While you're actively racing, hide the top bar, the target summary and the
+  // standings: you have to find the target on your own. They come back once
+  // you finish, give up or are spectating.
+  const racingNow = state.state === 'racing' && me()?.status === 'racing';
+  document.body.classList.toggle('is-racing', racingNow);
+  if (state.state !== 'racing') closeHelp();
   $('#lobby').hidden = state.state !== 'lobby';
   $('#race').hidden = state.state !== 'racing';
   $('#results').hidden = state.state !== 'finished';
@@ -443,8 +451,8 @@ function renderRace() {
 
   $('#race-start').textContent = state.start;
   $('#race-target').textContent = state.target;
-  $('#race-target').title = state.targetSummary?.extract || '';
   renderTargetSummary($('#target-card'));
+  renderHelp();
 
   $('#my-clicks').textContent = mine?.clicks ?? 0;
   $('#click-limit').textContent = state.settings.clickLimit ? ` / ${state.settings.clickLimit}` : '';
@@ -654,7 +662,7 @@ function renderArticle(data) {
   if (!state.settings.allowFind) hideTextFromFind(titleEl, body, ...(toc ? [toc] : []));
   if (toc) body.prepend(toc);
   $('#article').replaceChildren(titleEl, body);
-  $('#article-wrap').scrollTop = 0;
+  $('.race-body').scrollTop = 0; // the scroll area while racing
   window.scrollTo({ top: 0 });
 }
 
@@ -1012,10 +1020,53 @@ function bind() {
   $('#back-btn').onclick = goBack;
   $('#giveup-btn').onclick = () => confirm('Give up this race?') && tryAction('giveUp');
   $('#end-btn').onclick = () => confirm('End the race for everyone?') && tryAction('end');
+  $('#help-btn').onclick = () => ($('#help-panel').hidden ? openHelp() : closeHelp());
+  $('#help-close').onclick = closeHelp;
+  $('#hint-btn').onclick = () => {
+    hintRound = state.round;
+    renderHelp();
+  };
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && closeHelp());
   $('#to-lobby-btn').onclick = () => tryAction('lobby');
   $('#rematch-btn').onclick = async () => {
     if (await tryAction('lobby')) await tryAction('random', { which: 'both' });
   };
+}
+
+// ---- help panel ------------------------------------------------------------
+
+let hintRound = null; // round in which the player revealed the target hint
+
+function renderHelp() {
+  const s = state.settings;
+  const rules = [
+    `Get from ${state.start} to ${state.target} using only links in the article.`,
+    s.mode === 'time'
+      ? 'Fastest time wins. Once someone finishes, the race ends 2 minutes later (right away with 2 players).'
+      : 'Fewest clicks wins.',
+    s.allowBack ? 'The back button is allowed, but each back costs a click.' : 'No going back: every click is final.',
+    s.clickLimit ? `You have at most ${s.clickLimit} clicks.` : null,
+    s.timeLimitMin ? `The race ends after ${s.timeLimitMin} minute${s.timeLimitMin === 1 ? '' : 's'}.` : null,
+    s.allowFind ? 'Find-in-page (Ctrl/Cmd+F) is allowed.' : 'Find-in-page (Ctrl/Cmd+F) is off.',
+    'Tip: go broad (countries, centuries, wars), then narrow toward pages that would link to the target.',
+  ].filter(Boolean);
+  $('#help-rules').replaceChildren(...rules.map((r) => h('li', {}, r)));
+
+  const revealed = hintRound === state.round;
+  $('#hint-btn').hidden = revealed;
+  $('#help-target').hidden = !revealed;
+  if (revealed) renderTargetSummary($('#help-target'));
+}
+
+function openHelp() {
+  renderHelp();
+  $('#help-panel').hidden = false;
+  $('#help-btn').setAttribute('aria-expanded', 'true');
+}
+
+function closeHelp() {
+  $('#help-panel').hidden = true;
+  $('#help-btn').setAttribute('aria-expanded', 'false');
 }
 
 // Expose sticky header heights so the race header / sidebar can stick right below them.

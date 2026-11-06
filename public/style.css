@@ -1029,3 +1029,107 @@ button.theme-toggle.ghost:hover:not(:disabled) { border-color: var(--accent); co
 .article-body :is(h2, h3)[id] {
   scroll-margin-top: calc(var(--topbar-h, 64px) + var(--race-head-h, 120px) + 16px);
 }
+
+/* ---- focus mode while racing: no top bar, no target summary, no standings ---- */
+body.is-racing { --topbar-h: 0px; }
+body.is-racing #room > .topbar { display: none; }
+body.is-racing .race-body > .sidebar { display: none; }
+body.is-racing .race-body { grid-template-columns: minmax(0, 1fr); max-width: 1000px; }
+
+/* ---- help button (race bar, left corner) + panel ---- */
+.help-btn {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 17px;
+  font-weight: 700;
+  background: transparent;
+  border: 1px solid var(--bar-border);
+  color: var(--on-bar);
+}
+.help-btn:hover:not(:disabled), .help-btn[aria-expanded='true'] { border-color: var(--on-bar); }
+.help-panel {
+  position: fixed;
+  left: 20px;
+  top: calc(var(--topbar-h, 64px) + var(--race-head-h, 120px) + 8px);
+  z-index: 150;
+  width: min(360px, calc(100vw - 40px));
+  max-height: calc(100vh - var(--topbar-h, 64px) - var(--race-head-h, 120px) - 24px);
+  overflow-y: auto;
+  padding: 16px 20px 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.help-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.help-head h2 { margin: 0; font-family: var(--serif); font-size: 18px; }
+.help-rules { margin: 12px 0 14px; padding-left: 1.2em; font-size: 14px; line-height: 1.5; color: var(--text-2); }
+.help-rules li { margin: 0.3em 0; }
+.help-hint .target-card {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: var(--target-bg);
+  border: 1px solid var(--target-border);
+  border-radius: var(--radius);
+}
+.help-hint .ts-title { color: var(--target); font-family: var(--serif); font-size: 18px; }
+
+/* ---- racing layout: the race bar stays put and only the article scrolls ---- */
+body.is-racing { overflow: hidden; }
+body.is-racing #race {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+body.is-racing .race-head { position: static; flex: none; }
+/* The whole area under the race bar scrolls, so the scrollbar runs down the
+   right edge of the screen; the article card stays centered inside it. */
+body.is-racing .race-body {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 16px 24px 32px;
+  display: block;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.is-racing #article-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+/* Headings no longer sit under a sticky bar, so jump right to them. */
+body.is-racing .article-body :is(h2, h3)[id] { scroll-margin-top: 12px; }
+@media (max-width: 600px) {
+  body.is-racing .race-body { padding: 8px; }
+}
+
+/* ---- Wikipedia-sized article text ---- */
+.article-title { font-size: 28.8px; font-weight: 400; margin-bottom: 12px; }
+.article-body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.article-body p { margin: 0.5em 0; }
+.article-body h2 { font-family: var(--serif); font-size: 1.5em; font-weight: 400; margin: 1em 0 0.25em; padding-bottom: 2px; }
+.article-body h3 { font-size: 1.2em; font-weight: 700; margin: 0.3em 0 0; padding-top: 0.5em; }
+.article-body .wikitable { font-size: 100%; }
+.article-body .infobox { font-size: 88%; }
+.article-body figcaption, .article-body .thumbcaption { font-size: 94%; }
+.article-body .reflist, .article-body .references { font-size: 90%; }
+#article-wrap { padding: 20px 28px 32px; }
+@media (max-width: 600px) { #article-wrap { padding: 14px 14px 24px; } }
+@media (max-width: 600px) {
+  /* Keep the help button on the same row as the route. */
+  .race-bar { column-gap: 12px; }
+  .race-route { flex-basis: calc(100% - 48px); }
+}
