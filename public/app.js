@@ -917,8 +917,19 @@ function setupPagePicker(which) {
   });
 }
 
+// Marks the avatar for the site we're on; the other one links across.
+function bindSiteSwitch() {
+  for (const a of $$('.site-switch a')) {
+    if (a.dataset.host === location.hostname) {
+      a.setAttribute('aria-current', 'page');
+      a.addEventListener('click', (e) => e.preventDefault());
+    }
+  }
+}
+
 function bind() {
   bindTheme();
+  bindSiteSwitch();
   $('#name-input').value = storage.name();
   $('#create-btn').onclick = createRoom;
   $('#join-btn').onclick = () => joinRoom($('#code-input').value);

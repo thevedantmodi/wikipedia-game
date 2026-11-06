@@ -956,6 +956,14 @@ button.theme-toggle.ghost:hover:not(:disabled) { border-color: var(--accent); co
 .settings .radio-group label { display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer; font-size: 15px; font-weight: 400; color: var(--text); }
 .radio-group input { width: auto; margin: 0; min-height: 0; accent-color: var(--accent); }
 
+/* ---- site switcher (Hannah's / Vedant's deployments) ---- */
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.site-switch { display: flex; align-items: center; gap: 6px; }
+.site-switch a { display: block; border-radius: 50%; padding: 2px; border: 2px solid transparent; opacity: 0.6; transition: opacity 0.15s, border-color 0.15s; }
+.site-switch a:hover, .site-switch a:focus-visible { opacity: 1; border-color: var(--border-strong); }
+.site-switch a[aria-current='page'] { opacity: 1; border-color: var(--accent); cursor: default; }
+.site-switch img { display: block; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+
 /* ---- landmark alerts (top of page) ---- */
 .alerts {
   position: fixed;
