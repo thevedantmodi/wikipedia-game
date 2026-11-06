@@ -650,10 +650,60 @@ function renderArticle(data) {
   titleEl.textContent = new DOMParser().parseFromString(data.displayTitle, 'text/html').body.textContent;
   const body = h('div', { class: 'article-body' });
   body.append(...root.childNodes);
-  if (!state.settings.allowFind) hideTextFromFind(titleEl, body);
+  const toc = state.settings.showToc ? buildToc(body) : null;
+  if (!state.settings.allowFind) hideTextFromFind(titleEl, body, ...(toc ? [toc] : []));
+  if (toc) body.prepend(toc);
   $('#article').replaceChildren(titleEl, body);
   $('#article-wrap').scrollTop = 0;
   window.scrollTo({ top: 0 });
+}
+
+// Wikipedia-style "Contents" box built from the article's h2/h3 headings.
+// Entries scroll within the page instead of changing the URL hash.
+function buildToc(body) {
+  const headings = [...body.querySelectorAll('h2[id], h3[id]')];
+  if (headings.length < 2) return null;
+  const list = h('ol', {});
+  let section = 0;
+  let sub = 0;
+  let subList = null;
+  for (const el of headings) {
+    const text = el.textContent.trim();
+    if (!text) continue;
+    const isSub = el.tagName === 'H3' && section > 0;
+    let number;
+    if (isSub) {
+      number = `${section}.${++sub}`;
+    } else {
+      number = String(++section);
+      sub = 0;
+      subList = null;
+    }
+    const item = h('li', {},
+      h('a', { href: `#${el.id}`, class: 'toc-link', 'data-section': el.id },
+        h('span', { class: 'toc-num' }, number),
+        h('span', {}, text),
+      ),
+    );
+    if (isSub) {
+      if (!subList) {
+        subList = h('ol', {});
+        list.lastElementChild.append(subList);
+      }
+      subList.append(item);
+    } else {
+      list.append(item);
+    }
+  }
+  const box = h('details', { class: 'article-toc', open: true }, h('summary', {}, 'Contents'), list);
+  box.addEventListener('click', (e) => {
+    const link = e.target.closest('.toc-link');
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+    document.getElementById(link.dataset.section)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  return box;
 }
 
 // Browsers' find-in-page (including the Edit > Find menu, which can't be
