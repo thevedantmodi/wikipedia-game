@@ -161,7 +161,7 @@ async function route(req, res) {
 
   if (req.method === 'GET' && pathname === '/api/article') return handleArticle(req, res, url);
   if (req.method === 'GET' && pathname === '/api/search') {
-    const results = await wiki.search(url.searchParams.get('q'));
+    const results = await wiki.search(url.searchParams.get('q'), 20);
     return send(req, res, 200, { results }, { 'Cache-Control': 'public, max-age=3600' });
   }
 

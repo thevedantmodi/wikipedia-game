@@ -317,6 +317,9 @@ body.is-host .guest-only { display: none !important; }
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 20;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .ac-list li { padding: 0.45em 0.9em; cursor: pointer; display: flex; flex-direction: column; }
 .ac-list li.active, .ac-list li:hover { background: #eef2ff; }

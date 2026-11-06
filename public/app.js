@@ -663,7 +663,8 @@ function setupPagePicker(which) {
   input.setAttribute('autocomplete', 'off');
   const wrap = h('div', { class: 'ac' });
   input.replaceWith(wrap);
-  const list = h('ul', { class: 'ac-list', role: 'listbox' });
+  // preventDefault keeps focus in the input when dragging the list's scrollbar
+  const list = h('ul', { class: 'ac-list', role: 'listbox', onmousedown: (e) => e.preventDefault() });
   list.hidden = true;
   wrap.append(input, list);
 
@@ -712,7 +713,7 @@ function setupPagePicker(which) {
       try {
         const data = await api('GET', `/api/search?q=${encodeURIComponent(q)}`);
         if (mine !== seq || document.activeElement !== input) return;
-        results = data.results.filter((r) => !r.disambiguation).slice(0, 7);
+        results = data.results.filter((r) => !r.disambiguation);
         active = -1;
         paint();
       } catch {
@@ -728,6 +729,7 @@ function setupPagePicker(which) {
       if (e.key === 'ArrowDown') active = (active + 1) % n;
       else active = active <= 0 ? n - 1 : active - 1;
       paint();
+      list.children[active]?.scrollIntoView({ block: 'nearest' });
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const picked = active >= 0 ? results[active].title : input.value;
