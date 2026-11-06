@@ -176,6 +176,7 @@
     <div id="race" class="view" hidden>
       <div class="race-head">
         <div class="race-bar">
+          <button id="help-btn" class="help-btn" aria-label="Help" aria-expanded="false" aria-controls="help-panel">?</button>
           <div class="race-route">
             <span id="race-start" class="pill"></span>
             <svg class="arrow" width="28" height="14" viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="2" aria-label="to"><path d="M2 7h22M19 2l5 5-5 5"/></svg>
@@ -210,6 +211,19 @@
         </aside>
       </div>
       <div id="countdown" class="countdown" hidden></div>
+
+      <!-- Help: rules and an opt-in hint, since the target summary is hidden mid-race -->
+      <div id="help-panel" class="help-panel" role="dialog" aria-label="Help" hidden>
+        <div class="help-head">
+          <h2>How to play</h2>
+          <button id="help-close" class="ghost small" aria-label="Close help">✕</button>
+        </div>
+        <ul id="help-rules" class="help-rules"></ul>
+        <div class="help-hint">
+          <button id="hint-btn" class="small">Stuck? Show what the target is about</button>
+          <div id="help-target" class="target-card" hidden></div>
+        </div>
+      </div>
     </div>
 
     <!-- Results -->

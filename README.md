@@ -32,7 +32,7 @@ Without Redis, a deployment falls back to in-memory rooms. Those break as soon a
    - **Show opponents' pages live:** if this is off, you only see opponents' click counts until the race ends.
    - **Table of contents:** off by default. When on, each article starts with a numbered Contents box that jumps to its sections.
    - **Find-in-page:** off by default. Ctrl/Cmd+F is intercepted, and article text is drawn with CSS generated content, so even the browser's Edit → Find menu can't search it.
-4. After a synchronized 3-second countdown, everyone races. The sidebar shows live standings, and you get a toast when someone finishes.
+4. After a synchronized 3-second countdown, everyone races. While you race, the page only shows the article, your clicks and your time: the top bar, the target's summary and the live standings are hidden. The **?** button in the corner explains the rules and can reveal what the target is about as a hint. You still get a toast when someone finishes, and everything comes back once you finish or give up.
 5. The results screen shows each player's full path. The host can start a new round with one click.
 
 People who join mid-race spectate until the next round. If you refresh or drop your connection, you rejoin automatically, because your identity is kept in `localStorage`. If the host leaves, another player becomes host.
