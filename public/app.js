@@ -918,11 +918,16 @@ function setupPagePicker(which) {
 }
 
 // Marks the avatar for the site we're on; the other one links across.
+// Leaving mid-race asks first, since the other site is a different game.
 function bindSiteSwitch() {
   for (const a of $$('.site-switch a')) {
     if (a.dataset.host === location.hostname) {
       a.setAttribute('aria-current', 'page');
       a.addEventListener('click', (e) => e.preventDefault());
+    } else {
+      a.addEventListener('click', (e) => {
+        if (me()?.status === 'racing' && !confirm('Leave this race for the other site?')) e.preventDefault();
+      });
     }
   }
 }
