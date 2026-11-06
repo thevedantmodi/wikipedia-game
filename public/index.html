@@ -5,27 +5,63 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>WikiRace — multiplayer Wikipedia racing</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
+  <script>
+    // Apply the theme before first paint to avoid a flash.
+    try {
+      const t = localStorage.getItem('wikirace:theme');
+      const theme = t === 'light' || t === 'dark' ? t
+        : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = theme;
+      // Wikipedia's TemplateStyles key their dark variants on this class.
+      document.documentElement.classList.add(`skin-theme-clientpref-${theme === 'dark' ? 'night' : 'day'}`);
+    } catch {}
+  </script>
 </head>
 <body>
   <!-- Home -->
   <section id="home" class="screen">
-    <div class="home-card">
-      <h1>🏁 WikiRace</h1>
-      <p class="tagline">Same start. Same target. Only the links in the article. Race your friends across Wikipedia.</p>
-      <label class="field">
-        <span>Your name</span>
-        <input id="name-input" maxlength="20" placeholder="e.g. Link Lord" autocomplete="nickname">
-      </label>
-      <div class="home-actions">
-        <button id="create-btn" class="primary">Create a room</button>
-        <div class="join-row">
-          <input id="code-input" maxlength="4" placeholder="CODE" autocapitalize="characters">
-          <button id="join-btn">Join</button>
+    <header class="home-header">
+      <div class="brand"><svg class="logo" width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6" cy="22" r="3"/><circle cx="22" cy="6" r="3"/><path d="M8.5 19.5 L13 15 L15 17 L19.5 8.5"/></svg><span>Wikirace</span></div>
+      <button class="theme-toggle ghost" title="Toggle dark mode" aria-label="Toggle dark mode"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </header>
+    <main class="home-card">
+      <section class="hero">
+        <p class="eyebrow">Race your friends across Wikipedia</p>
+        <h1>Same start. Same target. Only the links in the article.</h1>
+        <div class="route-demo" aria-hidden="true">
+          <span class="chip start-chip">Pickle</span>
+          <svg width="40" height="16" viewBox="0 0 40 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8h34M30 2l6 6-6 6"/></svg>
+          <span class="chip target-chip">Napoleon</span>
+        </div>
+      </section>
+      <div class="home-grid">
+        <div class="home-panel create-panel">
+          <h2>Create a room</h2>
+          <label class="field">
+            <span>Your name</span>
+            <input id="name-input" maxlength="20" placeholder="e.g. Link Lord" autocomplete="nickname">
+          </label>
+          <div class="home-actions">
+            <button id="create-btn" class="primary">Create private room</button>
+          </div>
+          <p class="hint">You'll pick the start and target articles in the lobby.</p>
+        </div>
+        <div class="home-panel join-panel">
+          <h2>Join with a code</h2>
+          <label class="field-label" for="code-input">Room code</label>
+          <div class="join-row">
+            <input id="code-input" maxlength="4" placeholder="e.g. K7QF" autocapitalize="characters">
+            <button id="join-btn" class="ink">Join</button>
+          </div>
+          <p class="hint">Or open the invite link a friend sent you.</p>
         </div>
       </div>
       <p id="home-error" class="error" hidden></p>
-      <details class="rules">
+      <details class="rules home-panel">
         <summary>How to play</summary>
         <ul>
           <li>Everyone starts on the same article and races to the same target.</li>
@@ -35,45 +71,51 @@
           <li>Tip: go broad (countries, centuries, wars), then narrow toward the target's neighbours.</li>
         </ul>
       </details>
-    </div>
+    </main>
   </section>
 
   <!-- Room -->
   <section id="room" class="screen" hidden>
     <header class="topbar">
-      <div class="brand">🏁 WikiRace</div>
+      <div class="brand"><svg class="logo" width="24" height="24" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6" cy="22" r="3"/><circle cx="22" cy="6" r="3"/><path d="M8.5 19.5 L13 15 L15 17 L19.5 8.5"/></svg><span>Wikirace</span></div>
       <div class="room-code">Room <b id="room-code"></b>
         <button id="copy-link" class="ghost small" title="Copy invite link">Copy invite link</button>
       </div>
+      <button class="theme-toggle ghost" title="Toggle dark mode" aria-label="Toggle dark mode"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
       <button id="leave-btn" class="ghost small">Leave</button>
     </header>
 
     <!-- Lobby -->
     <div id="lobby" class="view" hidden>
       <div class="lobby-grid">
-        <div class="panel">
-          <h2>Race setup</h2>
-          <p id="host-hint" class="muted"></p>
-          <div class="page-pick">
-            <label>Start</label>
-            <div class="pick-row">
-              <input id="start-input" placeholder="Start article">
-              <button data-random="start" class="host-only small" title="Random start">🎲</button>
+        <section class="panel lobby-settings">
+          <div class="lobby-head">
+            <h2>Race settings</h2>
+            <span id="host-hint" class="muted"></span>
+          </div>
+          <div class="page-picks">
+            <div class="page-pick">
+              <label for="start-input">Start article</label>
+              <div class="pick-row">
+                <input id="start-input" class="article-input" placeholder="Start article">
+                <button data-random="start" class="host-only dice" title="Random start" aria-label="Random start">🎲</button>
+              </div>
+            </div>
+            <div class="page-pick target-pick">
+              <label for="target-input">Target article</label>
+              <div class="pick-row">
+                <input id="target-input" class="article-input" placeholder="Target article">
+                <button data-random="target" class="host-only dice" title="Random target" aria-label="Random target">🎲</button>
+              </div>
             </div>
           </div>
-          <div class="page-pick">
-            <label>Target</label>
-            <div class="pick-row">
-              <input id="target-input" placeholder="Target article">
-              <button data-random="target" class="host-only small" title="Random target">🎲</button>
-            </div>
+          <div class="pick-actions host-only">
+            <button data-random="both">Random pair</button>
           </div>
-          <button data-random="both" class="host-only">🎲 Random pair</button>
           <div id="target-preview" class="target-preview"></div>
 
-          <h3>Rules</h3>
           <div class="settings">
-            <label>Winner
+            <label>Win by
               <select data-setting="mode">
                 <option value="clicks">Fewest clicks</option>
                 <option value="time">Fastest time</option>
@@ -85,52 +127,70 @@
                 <option value="any">Any article (hard!)</option>
               </select>
             </label>
-            <label>Click limit
-              <input type="number" min="0" max="100" data-setting="clickLimit"> <span class="muted">0 = none</span>
+            <label>Click limit <span class="hint">0 = none</span>
+              <input type="number" min="0" max="100" data-setting="clickLimit">
             </label>
-            <label>Time limit (min)
-              <input type="number" min="0" max="60" data-setting="timeLimitMin"> <span class="muted">0 = none</span>
+            <label>Time limit (min) <span class="hint">0 = none</span>
+              <input type="number" min="0" max="60" data-setting="timeLimitMin">
             </label>
-            <label class="check"><input type="checkbox" data-setting="allowBack"> Allow back button (costs a click)</label>
-            <label class="check"><input type="checkbox" data-setting="showPaths"> Show opponents' pages live</label>
+          </div>
+
+          <fieldset class="house-rules">
+            <legend>House rules</legend>
+            <label class="check"><span>Allow back button <span class="muted">(costs a click)</span></span><input type="checkbox" data-setting="allowBack"></label>
+            <label class="check"><span>Show opponents' pages live <span class="muted">(off = clicks only)</span></span><input type="checkbox" data-setting="showPaths"></label>
+          </fieldset>
+        </section>
+        <aside class="lobby-side">
+          <div class="panel">
+            <div class="lobby-head">
+              <h2>Players</h2>
+              <span id="player-count" class="muted"></span>
+            </div>
+            <ul id="lobby-players" class="player-list"></ul>
           </div>
           <button id="start-btn" class="primary big host-only">Start race</button>
           <p id="lobby-error" class="error" hidden></p>
-        </div>
-        <div class="panel">
-          <h2>Players <span id="player-count" class="muted"></span></h2>
-          <ul id="lobby-players" class="player-list"></ul>
-          <p class="muted small-text">Share the room code or invite link. Players who join mid-race will spectate until the next round.</p>
-        </div>
+          <p class="muted small-text lobby-note">Share the room code or invite link. Players who join mid-race will spectate until the next round.</p>
+        </aside>
       </div>
     </div>
 
     <!-- Race -->
     <div id="race" class="view" hidden>
-      <div class="race-bar">
-        <div class="race-route">
-          <span id="race-start" class="pill"></span>
-          <span class="arrow">→</span>
-          <span id="race-target" class="pill target"></span>
+      <div class="race-head">
+        <div class="race-bar">
+          <div class="race-route">
+            <span id="race-start" class="pill"></span>
+            <svg class="arrow" width="28" height="14" viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="2" aria-label="to"><path d="M2 7h22M19 2l5 5-5 5"/></svg>
+            <span id="race-target" class="pill target"></span>
+          </div>
+          <div class="race-stats">
+            <div class="stat"><span class="stat-label">Time</span><b id="my-timer" class="stat-value">0:00</b></div>
+            <div class="stat"><span class="stat-label">Clicks</span><span class="stat-value"><b id="my-clicks">0</b><span id="click-limit" class="stat-limit"></span></span></div>
+          </div>
+          <div class="race-actions">
+            <button id="back-btn" class="small" hidden>← Back</button>
+            <button id="giveup-btn" class="ghost small">Give up</button>
+            <button id="end-btn" class="ghost small host-only">End race</button>
+          </div>
         </div>
-        <div class="race-stats">
-          <span>Clicks <b id="my-clicks">0</b><span id="click-limit"></span></span>
-          <span>⏱ <b id="my-timer">0:00</b></span>
-          <button id="back-btn" class="small" hidden>← Back</button>
-          <button id="giveup-btn" class="ghost small">Give up</button>
-          <button id="end-btn" class="ghost small host-only">End race</button>
-        </div>
+        <nav class="race-path" aria-label="Your path">
+          <span class="path-label">Your path:</span>
+          <div id="my-path" class="breadcrumbs"></div>
+        </nav>
       </div>
       <div class="race-body">
         <main id="article-wrap">
-          <div id="my-path" class="breadcrumbs"></div>
           <div id="race-banner" class="banner" hidden></div>
           <article id="article"></article>
         </main>
         <aside class="sidebar">
           <div id="target-card" class="target-card"></div>
-          <h3>Standings</h3>
-          <ol id="race-players" class="standings"></ol>
+          <section class="side-card">
+            <h2>Live standings</h2>
+            <ol id="race-players" class="standings"></ol>
+          </section>
         </aside>
       </div>
       <div id="countdown" class="countdown" hidden></div>
@@ -138,15 +198,24 @@
 
     <!-- Results -->
     <div id="results" class="view" hidden>
-      <div class="panel results-panel">
-        <h2 id="results-title">Results</h2>
-        <p id="results-route" class="muted"></p>
-        <ol id="results-list" class="results-list"></ol>
-        <div class="results-actions host-only">
-          <button id="rematch-btn" class="primary">New round (random pair)</button>
-          <button id="to-lobby-btn">Back to lobby</button>
-        </div>
-        <p id="results-wait" class="muted guest-only">Waiting for the host to start the next round…</p>
+      <div class="results-panel">
+        <section class="results-head">
+          <div class="results-heading">
+            <p id="results-route" class="results-eyebrow"></p>
+            <h1 id="results-title">Results</h1>
+          </div>
+          <div class="results-actions host-only">
+            <button id="to-lobby-btn">Back to lobby</button>
+            <button id="rematch-btn" class="primary">New round (random pair)</button>
+          </div>
+          <p id="results-wait" class="muted guest-only">Waiting for the host to start the next round…</p>
+        </section>
+        <section class="results-table">
+          <div class="results-row results-cols" aria-hidden="true">
+            <span>#</span><span>Player</span><span>Time</span><span>Clicks</span><span>Route</span>
+          </div>
+          <ol id="results-list" class="results-list"></ol>
+        </section>
       </div>
     </div>
   </section>
