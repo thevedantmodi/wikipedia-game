@@ -313,6 +313,7 @@ function renderLobby() {
     el.disabled = !host;
     if (document.activeElement === el) continue;
     if (el.type === 'checkbox') el.checked = Boolean(state.settings[key]);
+    else if (el.type === 'radio') el.checked = el.value === state.settings[key];
     else el.value = state.settings[key];
   }
 

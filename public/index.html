@@ -30,7 +30,7 @@
         <ul>
           <li>Everyone starts on the same article and races to the same target.</li>
           <li>Only links inside the article body work — no search bar, no navboxes.</li>
-          <li><b>Fewest clicks</b> mode ranks by clicks; <b>Fastest</b> mode ranks by time.</li>
+          <li><b>Fastest time</b> mode (the default) ranks by time; <b>Fewest clicks</b> mode ranks by clicks.</li>
           <li>The host can allow the back button (each back costs a click), set click or time limits, and choose whether opponents' pages are visible live.</li>
           <li>Find-in-page (Ctrl/Cmd+F) is off unless the host turns it on.</li>
           <li>Tip: go broad (countries, centuries, wars), then narrow toward the target's neighbours.</li>
@@ -74,18 +74,16 @@
 
           <h3>Rules</h3>
           <div class="settings">
-            <label>Winner
-              <select data-setting="mode">
-                <option value="clicks">Fewest clicks</option>
-                <option value="time">Fastest time</option>
-              </select>
-            </label>
-            <label>Random picks from
-              <select data-setting="randomSource">
-                <option value="popular">Well-known articles</option>
-                <option value="any">Any article (hard!)</option>
-              </select>
-            </label>
+            <fieldset class="radio-group">
+              <legend>Winner</legend>
+              <label><input type="radio" name="mode" value="time" data-setting="mode"> Fastest time</label>
+              <label><input type="radio" name="mode" value="clicks" data-setting="mode"> Fewest clicks</label>
+            </fieldset>
+            <fieldset class="radio-group">
+              <legend>Random picks from</legend>
+              <label><input type="radio" name="randomSource" value="popular" data-setting="randomSource"> Well-known articles</label>
+              <label><input type="radio" name="randomSource" value="any" data-setting="randomSource"> Any article (hard!)</label>
+            </fieldset>
             <label>Click limit
               <input type="number" min="0" max="100" data-setting="clickLimit"> <span class="muted">0 = none</span>
             </label>

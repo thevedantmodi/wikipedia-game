@@ -324,3 +324,9 @@ body.is-host .guest-only { display: none !important; }
 .ac-desc { font-size: 0.85em; color: var(--muted); }
 .suggestions { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
 .suggestions button { font-weight: 500; color: var(--text); }
+
+/* ---- radio groups in rules ---- */
+.radio-group { border: 0; margin: 0; padding: 0; display: grid; gap: 0.35em; font-size: 0.95em; }
+.radio-group legend { padding: 0; margin-bottom: 0.3em; }
+.settings .radio-group label { display: flex; align-items: center; gap: 0.5em; cursor: pointer; }
+.radio-group input { margin: 0; accent-color: var(--accent); }

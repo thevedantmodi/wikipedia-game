@@ -18,7 +18,7 @@ To play with friends on the same network, share `http://<your-ip>:3000/?room=COD
 1. Someone creates a room and shares the 4-letter code or the invite link.
 2. The host picks a start and a target. They can type titles or press 🎲 to get a random pair, drawn either from well-known articles or from any article.
 3. The host sets the rules:
-   - **Winner:** fewest clicks or fastest time.
+   - **Winner:** fastest time (the default) or fewest clicks.
    - **Click limit** and **time limit**.
    - **Back button:** allowed or not. Each back costs a click.
    - **Show opponents' pages live:** if this is off, you only see opponents' click counts until the race ends.
