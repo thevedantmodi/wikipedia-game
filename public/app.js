@@ -24,7 +24,8 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 let session = null; // { code, playerId, token }
 let state = null;
 let clockOffset = 0;
-let events = null;
+let pollTimer = null;
+let polling = false;
 let tickTimer = null;
 let moving = false;
 let localNav = null; // { round, title, clicks } from our latest move response
@@ -101,17 +102,20 @@ async function api(method, url, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status });
   return data;
 }
 
-function action(type, extra = {}) {
-  return api('POST', `/api/rooms/${session.code}/action`, {
+async function action(type, extra = {}) {
+  const code = session.code;
+  const data = await api('POST', `/api/rooms/${code}/action`, {
     playerId: session.playerId,
     token: session.token,
     type,
     ...extra,
   });
+  if (data.state && session?.code === code) applyState(data.state);
+  return data;
 }
 
 async function tryAction(type, extra) {
@@ -214,8 +218,7 @@ async function joinRoom(code, { silent = false } = {}) {
 }
 
 function goHome(message) {
-  events?.close();
-  events = null;
+  clearTimeout(pollTimer);
   clearInterval(tickTimer);
   session = state = localNav = null;
   shown = { round: null, title: null };
@@ -229,29 +232,64 @@ function goHome(message) {
 
 function enterRoom(creds) {
   session = creds;
+  state = null;
   history.replaceState(null, '', `/?room=${creds.code}`);
   $('#room-code').textContent = creds.code;
   showScreen('room');
   showError($('#home-error'), '');
-  events?.close();
-  const qs = new URLSearchParams({ pid: creds.playerId, token: creds.token });
-  events = new EventSource(`/api/rooms/${creds.code}/events?${qs}`);
-  events.onmessage = (e) => {
-    const next = JSON.parse(e.data);
-    clockOffset = next.serverNow - Date.now();
-    announce(next);
-    state = next;
-    render();
-  };
-  events.onerror = () => {
-    if (events.readyState === EventSource.CLOSED) {
-      storage.clearCreds(creds.code);
-      goHome(`Room ${creds.code} is no longer available.`);
-    }
-  };
   clearInterval(tickTimer);
   tickTimer = setInterval(tick, 200);
+  poll();
 }
+
+function applyState(next) {
+  // Poll and action responses can arrive out of order; keep the newest.
+  if (state && next.version < state.version) return;
+  clockOffset = next.serverNow - Date.now();
+  announce(next);
+  state = next;
+  render();
+}
+
+// State comes from polling: every second during a race, slower otherwise, and
+// not at all while the tab is hidden, so idle tabs cost no Redis reads.
+const POLL_RACING_MS = 1000;
+const POLL_IDLE_MS = 4000;
+
+function schedulePoll() {
+  clearTimeout(pollTimer);
+  if (!session || document.hidden) return;
+  pollTimer = setTimeout(poll, state?.state === 'racing' ? POLL_RACING_MS : POLL_IDLE_MS);
+}
+
+async function poll() {
+  if (!session || polling) return;
+  const { code, playerId, token } = session;
+  polling = true;
+  try {
+    const qs = new URLSearchParams({ pid: playerId, token });
+    const next = await api('GET', `/api/rooms/${code}/state?${qs}`);
+    if (session?.code === code) applyState(next);
+  } catch (err) {
+    if (session?.code !== code) return;
+    if (err.status === 404) {
+      storage.clearCreds(code);
+      goHome(`Room ${code} has closed. Rooms close after 20 minutes without activity.`);
+    } else if (err.status === 403) {
+      // We were dropped after being away too long: rejoin as a new player.
+      storage.clearCreds(code);
+      joinRoom(code, { silent: true });
+    }
+  } finally {
+    polling = false;
+    schedulePoll();
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearTimeout(pollTimer);
+  else poll();
+});
 
 function announce(next) {
   if (state && state.round === next.round) {
@@ -584,7 +622,7 @@ async function clickLink(title) {
   moving = true;
   $('#article-wrap').classList.add('loading');
   try {
-    const res = await action('move', { title });
+    const res = await action('move', { title, from: shown.title });
     localNav = { round: res.round, title: res.title, clicks: res.clicks };
     // Preload while we wait for the state broadcast.
     await ensureArticle();
@@ -601,7 +639,7 @@ async function goBack() {
   if (moving) return;
   moving = true;
   try {
-    const res = await action('back');
+    const res = await action('back', { from: shown.title });
     localNav = { round: res.round, title: res.title, clicks: res.clicks };
     await ensureArticle();
   } catch (err) {

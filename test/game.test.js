@@ -2,34 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Room, COUNTDOWN_MS } from '../lib/game.js';
 import { normalizeTitle } from '../lib/wiki.js';
-
-// Tiny fake link graph. "USA" is a redirect to "United States".
-const GRAPH = {
-  Pickle: ['Cucumber', 'USA', 'France'],
-  Cucumber: ['France', 'Pickle'],
-  'United States': ['France', 'Napoleon'],
-  France: ['Napoleon', 'Paris'],
-  Paris: ['France'],
-  Napoleon: ['France'],
-};
-const REDIRECTS = { USA: 'United States' };
-
-function fakeWiki() {
-  return {
-    async getArticle(raw) {
-      const key = normalizeTitle(raw);
-      const title = REDIRECTS[key] || key;
-      if (!GRAPH[title]) throw Object.assign(new Error(`No article ${title}`), { status: 404 });
-      return { title, displayTitle: title, html: '', links: new Set(GRAPH[title]), linkList: GRAPH[title] };
-    },
-    async getSummary(title) {
-      return { title, extract: '', thumbnail: null };
-    },
-    async randomTitle() {
-      return 'Paris';
-    },
-  };
-}
+import { fakeWiki } from './helpers.js';
 
 function setup({ settings = {}, players = 2 } = {}) {
   let clock = 1_000_000;
@@ -37,7 +10,7 @@ function setup({ settings = {}, players = 2 } = {}) {
   const ps = [];
   for (let i = 0; i < players; i++) {
     const p = room.addPlayer(`P${i}`);
-    room.setConnected(p.id, +1);
+    room.markSeen(p.id);
     ps.push(p);
   }
   const host = ps[0];
@@ -171,7 +144,6 @@ test('late joiners spectate and back-to-lobby resets everyone', async () => {
   const { room, players, begin, host } = setup();
   await begin();
   const late = room.addPlayer('Late');
-  room.setConnected(late.id, +1);
   assert.equal(late.status, 'lobby');
   await assert.rejects(room.move(late.id, 'France'), /not racing/);
   room.giveUp(players[0].id);
@@ -189,4 +161,24 @@ test('concurrent double-click only counts once', async () => {
   const results = await Promise.allSettled([room.move(a.id, 'France'), room.move(a.id, 'Cucumber')]);
   assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(a.clicks, 1);
+});
+
+test('a move from a page the player already left is rejected', async () => {
+  const { room, players, begin } = setup();
+  await begin();
+  const [a] = players;
+  await room.move(a.id, 'France', 'Pickle');
+  await assert.rejects(room.move(a.id, 'Paris', 'Pickle'), /already moved on/);
+  assert.equal(a.clicks, 1);
+});
+
+test('players who stop polling go offline and lose host', () => {
+  const { room, players, advance } = setup({ players: 2 });
+  advance(50_000);
+  room.markSeen(players[1].id);
+  advance(15_000);
+  room.tick();
+  const view = room.viewFor(players[1].id);
+  assert.equal(view.players.find((p) => p.id === players[0].id).online, false);
+  assert.equal(room.hostId, players[1].id);
 });
