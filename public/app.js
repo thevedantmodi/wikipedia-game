@@ -238,6 +238,7 @@ function goHome(message) {
 function enterRoom(creds) {
   session = creds;
   state = null;
+  seenAlertId = null;
   history.replaceState(null, '', `/?room=${creds.code}`);
   $('#room-code').textContent = creds.code;
   showScreen('room');
@@ -252,6 +253,7 @@ function applyState(next) {
   if (state && next.version < state.version) return;
   clockOffset = next.serverNow - Date.now();
   announce(next);
+  showAlerts(next.alerts || []);
   state = next;
   render();
 }
@@ -295,6 +297,33 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearTimeout(pollTimer);
   else poll();
 });
+
+// Landmark alerts ("Bob reached United States!") from the server. The server
+// already leaves out the viewer's own alerts. On the first state after
+// joining or refreshing, existing alerts are marked seen instead of replayed.
+let seenAlertId = null;
+const ALERT_ICONS = { 'United States': '🇺🇸' };
+
+function showAlerts(alerts) {
+  const newest = Math.max(0, ...alerts.map((a) => a.id));
+  if (seenAlertId == null) {
+    seenAlertId = newest;
+    return;
+  }
+  for (const a of alerts) {
+    if (a.id > seenAlertId) popAlert(`${ALERT_ICONS[a.title] || '📍'} ${a.name} reached ${a.title}!`);
+  }
+  seenAlertId = Math.max(seenAlertId, newest);
+}
+
+function popAlert(text) {
+  const el = h('div', { class: 'alert-pop', role: 'status' }, text);
+  $('#alerts').append(el);
+  setTimeout(() => {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 300);
+  }, 4000);
+}
 
 function announce(next) {
   if (state && state.round === next.round) {

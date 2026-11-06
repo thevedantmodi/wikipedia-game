@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Room, COUNTDOWN_MS } from '../lib/game.js';
+import { Room, COUNTDOWN_MS, serializeRoom, deserializeRoom } from '../lib/game.js';
 import { normalizeTitle } from '../lib/wiki.js';
 import { fakeWiki } from './helpers.js';
 
@@ -193,4 +193,27 @@ test('disambiguation pages are rejected with suggestions', async () => {
   assert.equal(room.target, null);
   await room.setPage(host.id, 'target', 'New York City');
   assert.equal(room.target, 'New York City');
+});
+
+test('reaching United States alerts everyone except the player who got there', async () => {
+  const { room, players, begin } = setup({ settings: { allowBack: true }, players: 3 });
+  await begin();
+  const [a, b, c] = players;
+  await room.move(a.id, 'USA'); // redirect still counts
+  const forB = room.viewFor(b.id).alerts;
+  assert.deepEqual(forB.map((x) => [x.name, x.title]), [['P0', 'United States']]);
+  assert.deepEqual(room.viewFor(c.id).alerts, forB);
+  assert.deepEqual(room.viewFor(a.id).alerts, []);
+
+  // Going back and returning doesn't alert again
+  room.back(a.id);
+  await room.move(a.id, 'USA');
+  assert.equal(room.viewFor(b.id).alerts.length, 1);
+
+  // Alerts survive the store round-trip and reset next round
+  const restored = deserializeRoom(serializeRoom(room), room.wiki, { now: room.now });
+  assert.deepEqual(restored.viewFor(b.id).alerts, forB);
+  await restored.move(b.id, 'USA');
+  assert.ok(restored.alerts.at(-1).id > forB[0].id);
+  assert.equal(restored.viewFor(a.id).alerts.length, 1);
 });

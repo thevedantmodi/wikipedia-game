@@ -962,3 +962,36 @@ button.theme-toggle.ghost:hover:not(:disabled) { border-color: var(--accent); co
 .radio-group legend { padding: 0; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text-2); }
 .settings .radio-group label { display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer; font-size: 15px; font-weight: 400; color: var(--text); }
 .radio-group input { width: auto; margin: 0; min-height: 0; accent-color: var(--accent); }
+
+/* ---- landmark alerts (top of page) ---- */
+.alerts {
+  position: fixed;
+  top: 0.75em;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 0.5em;
+  justify-items: center;
+  z-index: 210;
+  pointer-events: none;
+  width: max-content;
+  max-width: 92vw;
+}
+.alert-pop {
+  background: var(--ink);
+  color: var(--on-ink);
+  padding: 0.75em 1.3em;
+  border-radius: 999px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  animation: alert-in 0.25s ease-out;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.alert-pop.leaving { opacity: 0; transform: translateY(-10px); }
+@keyframes alert-in {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alert-pop { animation: none; transition: none; }
+}
