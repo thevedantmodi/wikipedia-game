@@ -1172,3 +1172,32 @@ body.is-racing .article-body :is(h2, h3)[id] { scroll-margin-top: 12px; }
   vertical-align: top;
   margin: 0.5em 0.8em 0.8em 0 !important;
 }
+
+/* ---- galleries (<ul class="gallery">) ----
+   Gallery tiles contain a div.thumb, which picked up the floating-picture
+   styles above and floated out of the grid, squeezing the next heading.
+   Wikipedia's own gallery CSS lives in the skin, not the article HTML, so
+   lay galleries out here: a wrapping grid of tiles with captions below. */
+.article-body ul.gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  list-style: none;
+  margin: 1em 0;
+  padding: 0;
+}
+.article-body ul.gallery > li.gallerycaption { flex-basis: 100%; font-weight: 700; text-align: center; }
+.article-body li.gallerybox { margin: 0; max-width: 100%; vertical-align: top; }
+.article-body li.gallerybox .thumb {
+  float: none;
+  clear: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 4px;
+  max-width: 100%;
+  min-height: 0 !important;
+}
+.article-body li.gallerybox .thumb > * { margin: 0 !important; }
+.article-body li.gallerybox .gallerytext { font-size: 88%; line-height: 1.4; padding: 4px 2px 0; color: var(--text-2); overflow-wrap: break-word; }
