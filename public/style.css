@@ -963,6 +963,10 @@ button.theme-toggle.ghost:hover:not(:disabled) { border-color: var(--accent); co
 .site-switch a:hover, .site-switch a:focus-visible { opacity: 1; border-color: var(--border-strong); }
 .site-switch a[aria-current='page'] { opacity: 1; border-color: var(--accent); cursor: default; }
 .site-switch img { display: block; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.topbar .site-switch img { width: 30px; height: 30px; }
+@media (max-width: 640px) {
+  .topbar .site-switch { display: none; }
+}
 
 /* ---- landmark alerts (top of page) ---- */
 .alerts {
