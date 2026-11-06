@@ -24,7 +24,8 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 let session = null; // { code, playerId, token }
 let state = null;
 let clockOffset = 0;
-let events = null;
+let pollTimer = null;
+let polling = false;
 let tickTimer = null;
 let moving = false;
 let localNav = null; // { round, title, clicks } from our latest move response
@@ -103,19 +104,23 @@ async function api(method, url, body) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw Object.assign(new Error(data.error || `Request failed (${res.status})`), {
+      status: res.status,
       suggestions: data.suggestions || [],
     });
   }
   return data;
 }
 
-function action(type, extra = {}) {
-  return api('POST', `/api/rooms/${session.code}/action`, {
+async function action(type, extra = {}) {
+  const code = session.code;
+  const data = await api('POST', `/api/rooms/${code}/action`, {
     playerId: session.playerId,
     token: session.token,
     type,
     ...extra,
   });
+  if (data.state && session?.code === code) applyState(data.state);
+  return data;
 }
 
 async function tryAction(type, extra) {
@@ -134,6 +139,33 @@ const storage = {
   setCreds: (c) => localStorage.setItem(`wikirace:room:${c.code}`, JSON.stringify(c)),
   clearCreds: (code) => localStorage.removeItem(`wikirace:room:${code}`),
 };
+
+// ---- theme -----------------------------------------------------------------
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  root.dataset.theme = theme;
+  // Wikipedia's TemplateStyles key their dark variants on these classes.
+  root.classList.toggle('skin-theme-clientpref-night', theme === 'dark');
+  root.classList.toggle('skin-theme-clientpref-day', theme !== 'dark');
+}
+
+function setTheme(theme) {
+  applyTheme(theme);
+  try { localStorage.setItem('wikirace:theme', theme); } catch {}
+}
+
+function bindTheme() {
+  for (const btn of $$('.theme-toggle')) {
+    btn.onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+  }
+  // Follow the OS setting until the player picks a theme explicitly.
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    let saved = null;
+    try { saved = localStorage.getItem('wikirace:theme'); } catch {}
+    if (!saved) applyTheme(e.matches ? 'dark' : 'light');
+  });
+}
 
 // ---- home ------------------------------------------------------------------
 
@@ -191,8 +223,7 @@ async function joinRoom(code, { silent = false } = {}) {
 }
 
 function goHome(message) {
-  events?.close();
-  events = null;
+  clearTimeout(pollTimer);
   clearInterval(tickTimer);
   session = state = localNav = null;
   shown = { round: null, title: null };
@@ -206,29 +237,64 @@ function goHome(message) {
 
 function enterRoom(creds) {
   session = creds;
+  state = null;
   history.replaceState(null, '', `/?room=${creds.code}`);
   $('#room-code').textContent = creds.code;
   showScreen('room');
   showError($('#home-error'), '');
-  events?.close();
-  const qs = new URLSearchParams({ pid: creds.playerId, token: creds.token });
-  events = new EventSource(`/api/rooms/${creds.code}/events?${qs}`);
-  events.onmessage = (e) => {
-    const next = JSON.parse(e.data);
-    clockOffset = next.serverNow - Date.now();
-    announce(next);
-    state = next;
-    render();
-  };
-  events.onerror = () => {
-    if (events.readyState === EventSource.CLOSED) {
-      storage.clearCreds(creds.code);
-      goHome(`Room ${creds.code} is no longer available.`);
-    }
-  };
   clearInterval(tickTimer);
   tickTimer = setInterval(tick, 200);
+  poll();
 }
+
+function applyState(next) {
+  // Poll and action responses can arrive out of order; keep the newest.
+  if (state && next.version < state.version) return;
+  clockOffset = next.serverNow - Date.now();
+  announce(next);
+  state = next;
+  render();
+}
+
+// State comes from polling: every second during a race, slower otherwise, and
+// not at all while the tab is hidden, so idle tabs cost no Redis reads.
+const POLL_RACING_MS = 1000;
+const POLL_IDLE_MS = 4000;
+
+function schedulePoll() {
+  clearTimeout(pollTimer);
+  if (!session || document.hidden) return;
+  pollTimer = setTimeout(poll, state?.state === 'racing' ? POLL_RACING_MS : POLL_IDLE_MS);
+}
+
+async function poll() {
+  if (!session || polling) return;
+  const { code, playerId, token } = session;
+  polling = true;
+  try {
+    const qs = new URLSearchParams({ pid: playerId, token });
+    const next = await api('GET', `/api/rooms/${code}/state?${qs}`);
+    if (session?.code === code) applyState(next);
+  } catch (err) {
+    if (session?.code !== code) return;
+    if (err.status === 404) {
+      storage.clearCreds(code);
+      goHome(`Room ${code} has closed. Rooms close after 20 minutes without activity.`);
+    } else if (err.status === 403) {
+      // We were dropped after being away too long: rejoin as a new player.
+      storage.clearCreds(code);
+      joinRoom(code, { silent: true });
+    }
+  } finally {
+    polling = false;
+    schedulePoll();
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearTimeout(pollTimer);
+  else poll();
+});
 
 function announce(next) {
   if (state && state.round === next.round) {
@@ -263,16 +329,22 @@ function render() {
   else renderResults();
 }
 
+const AVATAR_COLORS = ['accent', 'orange', 'teal', 'violet'];
+
 function renderPlayerList(ul) {
   ul.replaceChildren(
-    ...state.players.map((p) =>
-      h('li', { class: p.online ? '' : 'offline' },
-        h('span', { class: 'dot', title: p.online ? 'online' : 'offline' }),
-        h('span', { class: 'pname' }, p.name),
-        p.isHost && h('span', { class: 'tag' }, '👑 host'),
-        p.id === state.you && h('span', { class: 'tag you' }, 'you'),
-      ),
-    ),
+    ...state.players.map((p, i) => {
+      const meta = [p.isHost && 'host', p.id === state.you && 'you'].filter(Boolean).join(' · ');
+      return h('li', { class: p.online ? '' : 'offline' },
+        h('span', {
+          class: `dot avatar-${AVATAR_COLORS[i % AVATAR_COLORS.length]}`,
+          title: p.online ? 'online' : 'offline',
+          'aria-hidden': 'true',
+        }, (p.name || '?').trim().charAt(0).toUpperCase() || '?'),
+        h('span', { class: 'pname' }, p.name, meta && h('span', { class: 'pmeta' }, meta)),
+        !p.online && h('span', { class: 'pstatus' }, 'Offline'),
+      );
+    }),
   );
 }
 
@@ -318,7 +390,7 @@ function renderLobby() {
   }
 
   $('#start-btn').disabled = !state.start || !state.target;
-  $('#player-count').textContent = `(${state.players.length})`;
+  $('#player-count').textContent = `${state.players.length} ${state.players.length === 1 ? 'player' : 'players'}`;
   renderPlayerList($('#lobby-players'));
 }
 
@@ -365,27 +437,33 @@ function renderRace() {
   $('#my-path').replaceChildren(
     ...path.flatMap((t, i) => [i > 0 && h('span', { class: 'sep' }, '›'), h('span', {}, t)]).filter(Boolean),
   );
+  $('#my-path').scrollLeft = $('#my-path').scrollWidth;
 
   // Standings
   $('#race-players').replaceChildren(
-    ...state.players.map((p) =>
+    ...state.players.map((p, i) =>
       h('li', { class: `${p.status} ${p.online ? '' : 'offline'} ${p.id === state.you ? 'me' : ''}` },
-        h('span', { class: 'place' }, p.place ? MEDALS[p.place - 1] || `#${p.place}` : STATUS_ICON[p.status]),
+        h('span', { class: `avatar c${p.id === state.you ? 'me' : i % 4}`, 'aria-hidden': 'true' },
+          (p.name || '?').trim().charAt(0).toUpperCase() || '?'),
         h('div', { class: 'who' },
-          h('div', {},
+          h('div', { class: 'who-name' },
             h('b', {}, p.name),
             p.id === state.you && h('span', { class: 'tag you' }, 'you'),
           ),
-          h('div', { class: 'muted small-text' },
+          h('div', { class: 'who-sub' },
             p.status === 'lobby'
               ? 'spectating'
-              : `${p.clicks} click${p.clicks === 1 ? '' : 's'}` +
-                  (p.finishedMs != null ? ` · ${formatMsPrecise(p.finishedMs)}` : '') +
-                  (p.status !== 'racing' && p.status !== 'finished' ? ` · ${STATUS_LABEL[p.status]}` : ''),
+              : [
+                  p.current && p.id !== state.you && p.status === 'racing' ? `on ${p.current}` : null,
+                  p.finishedMs != null ? formatMsPrecise(p.finishedMs) : null,
+                  p.status !== 'racing' ? STATUS_LABEL[p.status] : null,
+                ].filter(Boolean).join(' · ') || STATUS_LABEL[p.status],
           ),
-          p.current && p.id !== state.you && p.status === 'racing' &&
-            h('div', { class: 'small-text current' }, `on ${p.current}`),
         ),
+        h('span', { class: 'place', title: p.place ? `Place ${p.place}` : STATUS_LABEL[p.status] },
+          p.place ? MEDALS[p.place - 1] || `#${p.place}` : STATUS_ICON[p.status]),
+        p.status !== 'lobby' &&
+          h('span', { class: 'clicks', title: `${p.clicks} click${p.clicks === 1 ? '' : 's'}` }, p.clicks),
       ),
     ),
   );
@@ -411,20 +489,26 @@ function renderResults() {
   }`;
   $('#results-list').replaceChildren(
     ...participants.map((p) =>
-      h('li', { class: p.status },
-        h('div', { class: 'result-head' },
-          h('span', { class: 'place' }, p.place ? MEDALS[p.place - 1] || `#${p.place}` : STATUS_ICON[p.status]),
+      h('li', { class: `results-row ${p.status} ${p.place === 1 ? 'winner' : ''} ${p.id === state.you ? 'me' : ''}` },
+        h('span', { class: 'place', title: p.place ? `Place ${p.place}` : STATUS_LABEL[p.status] },
+          p.place ? MEDALS[p.place - 1] || `#${p.place}` : STATUS_ICON[p.status]),
+        h('span', { class: 'result-name' },
           h('b', {}, p.name),
           p.id === state.you && h('span', { class: 'tag you' }, 'you'),
-          h('span', { class: 'muted' },
-            `${p.clicks} click${p.clicks === 1 ? '' : 's'}` +
-              (p.finishedMs != null ? ` · ${formatMsPrecise(p.finishedMs)}` : ` · ${STATUS_LABEL[p.status]}`),
-          ),
         ),
+        h('span', { class: `result-time ${p.finishedMs != null ? '' : 'dnf'}` },
+          p.finishedMs != null ? formatMsPrecise(p.finishedMs) : STATUS_LABEL[p.status]),
+        h('span', { class: 'result-clicks' },
+          `${p.clicks}`, h('span', { class: 'unit' }, ` click${p.clicks === 1 ? '' : 's'}`)),
         h('div', { class: 'result-path' },
-          ...(p.path || []).flatMap((t, i) => [
+          ...(p.path || []).flatMap((t, i, arr) => [
             i > 0 && h('span', { class: 'sep' }, '›'),
-            h('a', { href: wikiUrl(t), target: '_blank', rel: 'noopener' }, t),
+            h('a', {
+              href: wikiUrl(t),
+              target: '_blank',
+              rel: 'noopener',
+              class: i === arr.length - 1 && p.status === 'finished' ? 'is-target' : null,
+            }, t),
           ]),
         ),
       ),
@@ -513,6 +597,7 @@ function renderArticle(data) {
     }
     if (title && links.has(title) && title !== data.title) {
       a.classList.add('game-link');
+      if (title === state?.target) a.classList.add('is-target');
       a.dataset.title = title;
       a.setAttribute('href', '#');
     } else {
@@ -585,7 +670,7 @@ async function clickLink(title) {
   moving = true;
   $('#article-wrap').classList.add('loading');
   try {
-    const res = await action('move', { title });
+    const res = await action('move', { title, from: shown.title });
     localNav = { round: res.round, title: res.title, clicks: res.clicks };
     // Preload while we wait for the state broadcast.
     await ensureArticle();
@@ -602,7 +687,7 @@ async function goBack() {
   if (moving) return;
   moving = true;
   try {
-    const res = await action('back');
+    const res = await action('back', { from: shown.title });
     localNav = { round: res.round, title: res.title, clicks: res.clicks };
     await ensureArticle();
   } catch (err) {
@@ -750,6 +835,7 @@ function setupPagePicker(which) {
 }
 
 function bind() {
+  bindTheme();
   $('#name-input').value = storage.name();
   $('#create-btn').onclick = createRoom;
   $('#join-btn').onclick = () => joinRoom($('#code-input').value);
@@ -833,8 +919,21 @@ function bind() {
   };
 }
 
+// Expose sticky header heights so the race header / sidebar can stick right below them.
+function trackStickyHeights() {
+  if (typeof ResizeObserver === 'undefined') return;
+  for (const [sel, prop] of [['.topbar', '--topbar-h'], ['.race-head', '--race-head-h']]) {
+    const el = $(sel);
+    if (!el) continue;
+    new ResizeObserver(() => {
+      if (el.offsetHeight) document.documentElement.style.setProperty(prop, `${el.offsetHeight}px`);
+    }).observe(el);
+  }
+}
+
 function boot() {
   bind();
+  trackStickyHeights();
   const code = new URLSearchParams(location.search).get('room')?.toUpperCase();
   if (code && /^[A-Z]{4}$/.test(code)) {
     $('#code-input').value = code;
