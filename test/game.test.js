@@ -182,3 +182,15 @@ test('players who stop polling go offline and lose host', () => {
   assert.equal(view.players.find((p) => p.id === players[0].id).online, false);
   assert.equal(room.hostId, players[1].id);
 });
+
+test('disambiguation pages are rejected with suggestions', async () => {
+  const { room, host } = setup();
+  await assert.rejects(room.setPage(host.id, 'target', 'new York'), (err) => {
+    assert.match(err.message, /disambiguation/);
+    assert.deepEqual(err.suggestions.map((s) => s.title), ['New York City']);
+    return true;
+  });
+  assert.equal(room.target, null);
+  await room.setPage(host.id, 'target', 'New York City');
+  assert.equal(room.target, 'New York City');
+});

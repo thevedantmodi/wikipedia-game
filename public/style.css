@@ -925,3 +925,40 @@ button.theme-toggle.ghost:hover:not(:disabled) { border-color: var(--accent); co
 .theme-toggle .moon { display: none; }
 :root[data-theme='dark'] .theme-toggle .sun { display: none; }
 :root[data-theme='dark'] .theme-toggle .moon { display: block; }
+
+/* ---- find-in-page protection (see hideTextFromFind in app.js) ---- */
+.nf::before { content: attr(data-t); }
+#article:has(.nf) { user-select: none; -webkit-user-select: none; }
+
+/* ---- page picker autocomplete ---- */
+.ac { position: relative; flex: 1; min-width: 0; display: flex; }
+.ac input { flex: 1; min-width: 0; }
+.ac-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  z-index: 20;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ac-list li { padding: 8px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.ac-list li.active, .ac-list li:hover { background: var(--accent-soft); }
+.ac-title { font-family: var(--serif); font-size: 16px; color: var(--text); }
+.ac-desc { font-size: 13px; color: var(--muted); }
+.suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.suggestions button { font-weight: 500; color: var(--text); }
+
+/* ---- radio groups in rules ---- */
+.radio-group { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.radio-group legend { padding: 0; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.settings .radio-group label { display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer; font-size: 15px; font-weight: 400; color: var(--text); }
+.radio-group input { width: auto; margin: 0; min-height: 0; accent-color: var(--accent); }

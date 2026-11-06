@@ -26,10 +26,11 @@ Without Redis, a deployment falls back to in-memory rooms. Those break as soon a
 1. Someone creates a room and shares the 4-letter code or the invite link.
 2. The host picks a start and a target. They can type titles or press 🎲 to get a random pair, drawn either from well-known articles or from any article.
 3. The host sets the rules:
-   - **Winner:** fewest clicks or fastest time.
+   - **Winner:** fastest time (the default) or fewest clicks.
    - **Click limit** and **time limit**.
    - **Back button:** allowed or not. Each back costs a click.
    - **Show opponents' pages live:** if this is off, you only see opponents' click counts until the race ends.
+   - **Find-in-page:** off by default. Ctrl/Cmd+F is intercepted, and article text is drawn with CSS generated content, so even the browser's Edit → Find menu can't search it.
 4. After a synchronized 3-second countdown, everyone races. The sidebar shows live standings, and you get a toast when someone finishes.
 5. The results screen shows each player's full path. The host can start a new round with one click.
 

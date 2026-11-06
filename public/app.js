@@ -102,7 +102,12 @@ async function api(method, url, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status });
+  if (!res.ok) {
+    throw Object.assign(new Error(data.error || `Request failed (${res.status})`), {
+      status: res.status,
+      suggestions: data.suggestions || [],
+    });
+  }
   return data;
 }
 
@@ -380,6 +385,7 @@ function renderLobby() {
     el.disabled = !host;
     if (document.activeElement === el) continue;
     if (el.type === 'checkbox') el.checked = Boolean(state.settings[key]);
+    else if (el.type === 'radio') el.checked = el.value === state.settings[key];
     else el.value = state.settings[key];
   }
 
@@ -611,10 +617,52 @@ function renderArticle(data) {
   titleEl.textContent = new DOMParser().parseFromString(data.displayTitle, 'text/html').body.textContent;
   const body = h('div', { class: 'article-body' });
   body.append(...root.childNodes);
+  if (!state.settings.allowFind) hideTextFromFind(titleEl, body);
   $('#article').replaceChildren(titleEl, body);
   $('#article-wrap').scrollTop = 0;
   window.scrollTo({ top: 0 });
 }
+
+// Browsers' find-in-page (including the Edit > Find menu, which can't be
+// intercepted) does not search CSS generated content, so render every text
+// node through ::before { content: attr(data-t) }.
+function hideTextFromFind(...roots) {
+  for (const root of roots) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) =>
+        !n.nodeValue.trim() || n.parentElement?.closest('style')
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT,
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      const span = document.createElement('span');
+      span.className = 'nf';
+      span.dataset.t = node.nodeValue;
+      node.replaceWith(span);
+    }
+  }
+}
+
+function findBlocked() {
+  return state?.state === 'racing' && !state.settings.allowFind && me()?.status === 'racing';
+}
+
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (!findBlocked()) return;
+    const key = e.key.toLowerCase();
+    const isFind = (e.metaKey || e.ctrlKey) && (key === 'f' || key === 'g');
+    if (isFind || e.key === 'F3') {
+      e.preventDefault();
+      e.stopPropagation();
+      toast('Find-in-page is disabled for this race 🙈');
+    }
+  },
+  true,
+);
 
 async function clickLink(title) {
   const mine = me();
@@ -652,6 +700,140 @@ async function goBack() {
 
 // ---- wiring ----------------------------------------------------------------
 
+// Shows an error under the page pickers, with "did you mean" buttons when the
+// server suggests alternatives (e.g. "New York" -> "New York City").
+function showPageError(which, err) {
+  const el = $('#lobby-error');
+  const suggestions = err.suggestions || [];
+  el.replaceChildren(
+    h('div', {}, err.message),
+    suggestions.length > 0 &&
+      h('div', { class: 'suggestions' },
+        ...suggestions.map((s) =>
+          h('button', { class: 'small', onclick: () => setPage(which, s.title) },
+            s.title,
+            s.description && h('span', { class: 'muted' }, ` — ${s.description}`),
+          ),
+        ),
+      ),
+  );
+  el.hidden = false;
+}
+
+const pendingPage = {};
+
+async function setPage(which, title) {
+  const input = $(`#${which}-input`);
+  title = title.trim();
+  if (!title || title === state?.[which] || title === pendingPage[which]) return;
+  pendingPage[which] = title;
+  input.value = title;
+  input.classList.add('busy');
+  showError($('#lobby-error'), '');
+  try {
+    await action('setPage', { which, title });
+  } catch (err) {
+    showPageError(which, err);
+    input.value = state?.[which] || '';
+  } finally {
+    delete pendingPage[which];
+    input.classList.remove('busy');
+  }
+}
+
+// Title autocomplete backed by Wikipedia's prefix search. Disambiguation pages
+// are left out so you pick "New York City" rather than "New York".
+function setupPagePicker(which) {
+  const input = $(`#${which}-input`);
+  input.setAttribute('autocomplete', 'off');
+  const wrap = h('div', { class: 'ac' });
+  input.replaceWith(wrap);
+  // preventDefault keeps focus in the input when dragging the list's scrollbar
+  const list = h('ul', { class: 'ac-list', role: 'listbox', onmousedown: (e) => e.preventDefault() });
+  list.hidden = true;
+  wrap.append(input, list);
+
+  let results = [];
+  let active = -1;
+  let timer = null;
+  let seq = 0;
+
+  const close = () => {
+    list.hidden = true;
+    active = -1;
+  };
+  const paint = () => {
+    list.replaceChildren(
+      ...results.map((r, i) =>
+        h('li', {
+            class: i === active ? 'active' : '',
+            role: 'option',
+            // mousedown fires before the input's blur, so the pick isn't lost
+            onmousedown: (e) => {
+              e.preventDefault();
+              choose(r.title);
+            },
+          },
+          h('span', { class: 'ac-title' }, r.title),
+          r.description && h('span', { class: 'ac-desc' }, r.description),
+        ),
+      ),
+    );
+    list.hidden = results.length === 0;
+  };
+  const choose = (title) => {
+    close();
+    setPage(which, title);
+  };
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (!q) {
+      results = [];
+      return close();
+    }
+    timer = setTimeout(async () => {
+      const mine = ++seq;
+      try {
+        const data = await api('GET', `/api/search?q=${encodeURIComponent(q)}`);
+        if (mine !== seq || document.activeElement !== input) return;
+        results = data.results.filter((r) => !r.disambiguation);
+        active = -1;
+        paint();
+      } catch {
+        close();
+      }
+    }, 150);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (list.hidden) return;
+      e.preventDefault();
+      const n = results.length;
+      if (e.key === 'ArrowDown') active = (active + 1) % n;
+      else active = active <= 0 ? n - 1 : active - 1;
+      paint();
+      list.children[active]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const picked = active >= 0 ? results[active].title : input.value;
+      seq++; // ignore searches still in flight
+      clearTimeout(timer);
+      choose(picked);
+      input.blur();
+    } else if (e.key === 'Escape') {
+      close();
+    }
+  });
+  input.addEventListener('blur', () => {
+    clearTimeout(timer);
+    seq++;
+    close();
+    setPage(which, input.value);
+  });
+}
+
 function bind() {
   bindTheme();
   $('#name-input').value = storage.name();
@@ -685,25 +867,7 @@ function bind() {
     goHome();
   };
 
-  for (const which of ['start', 'target']) {
-    const input = $(`#${which}-input`);
-    const commit = async () => {
-      const title = input.value.trim();
-      if (!title || title === state?.[which]) return;
-      input.classList.add('busy');
-      showError($('#lobby-error'), '');
-      try {
-        await action('setPage', { which, title });
-      } catch (err) {
-        showError($('#lobby-error'), err.message);
-        input.value = state?.[which] || '';
-      } finally {
-        input.classList.remove('busy');
-      }
-    };
-    input.addEventListener('change', commit);
-    input.addEventListener('keydown', (e) => e.key === 'Enter' && input.blur());
-  }
+  for (const which of ['start', 'target']) setupPagePicker(which);
 
   for (const btn of $$('[data-random]')) {
     btn.onclick = async () => {
