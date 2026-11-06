@@ -83,7 +83,8 @@ test('race ends when everyone is done; fewest clicks ranks first', async () => {
 });
 
 test('time mode ranks by finish time', async () => {
-  const { room, players, begin, advance } = setup({ settings: { mode: 'time' } });
+  // 3 players: a 2-player timed race would end at the first finish
+  const { room, players, begin, advance } = setup({ settings: { mode: 'time' }, players: 3 });
   await begin();
   const [a, b] = players;
   await room.move(b.id, 'Cucumber');
@@ -258,4 +259,16 @@ test('fewest-clicks races keep going after the first finish', async () => {
   await room.move(players[0].id, 'France');
   await room.move(players[0].id, 'Napoleon');
   assert.equal(room.endsAt, null);
+});
+
+test('two-player fastest-time races end as soon as someone finishes', async () => {
+  const { room, players, begin } = setup({ settings: { mode: 'time' }, players: 2 });
+  await begin();
+  const [a, b] = players;
+  await room.move(b.id, 'France');
+  await room.move(a.id, 'France');
+  await room.move(a.id, 'Napoleon');
+  assert.equal(room.state, 'finished');
+  assert.equal(a.status, 'finished');
+  assert.equal(b.status, 'dnf');
 });
