@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wikirace home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Source+Serif+4:opsz,wght@8..60,500;8..60,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F6F6F3}
+a{color:#3366CC}a:hover{color:#1F4FA8}
+</style>
+</helmet>
+<div style="min-height: 900px; background: #F6F6F3; color: #1A1A1A; font-family: Inter, system-ui, sans-serif">
+<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 32px; border-bottom: 1px solid #DEDED8; background: #FFFFFF">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#1A1A1A" stroke-width="2" aria-hidden="true"><circle cx="6" cy="22" r="3"></circle><circle cx="22" cy="6" r="3"></circle><path d="M8.5 19.5 L13 15 L15 17 L19.5 8.5"></path></svg>
+<span style="font-family: 'Source Serif 4', Georgia, serif; font-size: 24px; font-weight: 700">Wikirace</span>
+</div>
+<nav style="display: flex; flex-wrap: wrap; gap: 24px; font-size: 15px; align-items: center">
+<a href="#" style="text-decoration: none">How to play</a>
+<a href="#" style="text-decoration: none">Daily race</a>
+<a href="#" style="text-decoration: none">Leaderboards</a>
+<button style="min-height: 44px; padding: 0 16px; border: 1px solid #C9C9C2; border-radius: 8px; background: #FFFFFF; font: inherit; font-weight: 500; color: #1A1A1A">Set nickname</button>
+</nav>
+</header>
+
+<main style="max-width: 1120px; margin: 0 auto; padding: 48px 24px 64px; display: flex; flex-direction: column; gap: 40px">
+<section style="display: flex; flex-direction: column; gap: 16px">
+<p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5B5B55">Race your friends across Wikipedia</p>
+<h1 style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 56px; line-height: 1.05; font-weight: 700; max-width: 820px">Same start. Same target. Only the links in the article.</h1>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-family: 'Source Serif 4', Georgia, serif; font-size: 22px">
+<span style="padding: 8px 14px; background: #FFFFFF; border: 1px solid #DEDED8; border-radius: 8px">Pickle</span>
+<svg width="40" height="16" viewBox="0 0 40 16" fill="none" stroke="#5B5B55" stroke-width="2" aria-hidden="true"><path d="M2 8h34M30 2l6 6-6 6"></path></svg>
+<span style="padding: 8px 14px; background: #FFF4EC; border: 1px solid #F0C9AE; border-radius: 8px; color: #9A3412">Napoleon</span>
+<span style="font-family: Inter, sans-serif; font-size: 15px; color: #5B5B55">best known path: 3 clicks</span>
+</div>
+</section>
+
+<section style="display: flex; flex-wrap: wrap; gap: 24px">
+<div style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border: 1px solid #DEDED8; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 20px">
+<h2 style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 28px">Create a room</h2>
+<fieldset style="margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<legend style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #3D3D38">Game mode</legend>
+<label style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 2px solid #3366CC; border-radius: 10px; background: #F2F6FD"><span style="display: flex; gap: 8px; align-items: center; font-weight: 600"><input type="radio" name="mode" checked=""> Speed race</span><span style="font-size: 13px; color: #5B5B55">First to the target wins</span></label>
+<label style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1px solid #DEDED8; border-radius: 10px"><span style="display: flex; gap: 8px; align-items: center; font-weight: 600"><input type="radio" name="mode"> Wiki golf</span><span style="font-size: 13px; color: #5B5B55">Fewest clicks wins</span></label>
+<label style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1px solid #DEDED8; border-radius: 10px"><span style="display: flex; gap: 8px; align-items: center; font-weight: 600"><input type="radio" name="mode"> Click-limited</span><span style="font-size: 13px; color: #5B5B55">Get there in N clicks or less</span></label>
+<label style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1px solid #DEDED8; border-radius: 10px"><span style="display: flex; gap: 8px; align-items: center; font-weight: 600"><input type="radio" name="mode"> Philosophy</span><span style="font-size: 13px; color: #5B5B55">Guess how many first links it takes</span></label>
+</fieldset>
+<button style="min-height: 52px; border: 0; border-radius: 10px; background: #3366CC; color: #FFFFFF; font: inherit; font-size: 17px; font-weight: 600">Create private room</button>
+</div>
+
+<div style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+<div style="background: #FFFFFF; border: 1px solid #DEDED8; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 28px">Join with a code</h2>
+<label for="code" style="font-size: 14px; font-weight: 600; color: #3D3D38">Room code</label>
+<div style="display: flex; gap: 10px; flex-wrap: wrap">
+<input id="code" placeholder="e.g. K7QF" style="flex: 1 1 140px; min-width: 0; min-height: 52px; padding: 0 16px; border: 1px solid #C9C9C2; border-radius: 10px; font: inherit; font-size: 22px; letter-spacing: 0.2em; text-transform: uppercase">
+<button style="min-height: 52px; padding: 0 22px; border: 1px solid #1A1A1A; border-radius: 10px; background: #1A1A1A; color: #FFFFFF; font: inherit; font-weight: 600">Join</button>
+</div>
+<p style="margin: 0; font-size: 13px; color: #5B5B55">Or open the invite link a friend sent you.</p>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DEDED8; border-radius: 12px; padding: 24px 28px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap">
+<h2 style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 22px">Daily race</h2>
+<span style="font-size: 13px; color: #5B5B55">resets in 6h 12m</span>
+</div>
+<p style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 19px">Tardigrade → Byzantine Empire</p>
+<a href="Race.dc.html" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid #3366CC; border-radius: 10px; text-decoration: none; font-weight: 600">Play today’s race</a>
+</div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #3D3D38">Public rooms open now</h2>
+<div style="overflow-x: auto; background: #FFFFFF; border: 1px solid #DEDED8; border-radius: 12px">
+<table style="width: 100%; min-width: 620px; border-collapse: collapse; font-size: 15px">
+<thead><tr style="text-align: left; color: #5B5B55; font-size: 13px"><th style="padding: 12px 20px; font-weight: 600">Route</th><th style="padding: 12px 20px; font-weight: 600">Mode</th><th style="padding: 12px 20px; font-weight: 600">Players</th><th style="padding: 12px 20px"></th></tr></thead>
+<tbody>
+<tr style="border-top: 1px solid #ECECE6"><td style="padding: 12px 20px; font-family: 'Source Serif 4', Georgia, serif; font-size: 17px">Kazoo → Black hole</td><td style="padding: 12px 20px">Speed race</td><td style="padding: 12px 20px">5 / 8</td><td style="padding: 12px 20px; text-align: right"><a href="Lobby.dc.html" style="font-weight: 600">Join</a></td></tr>
+<tr style="border-top: 1px solid #ECECE6"><td style="padding: 12px 20px; font-family: 'Source Serif 4', Georgia, serif; font-size: 17px">Random → Random</td><td style="padding: 12px 20px">Wiki golf</td><td style="padding: 12px 20px">2 / 6</td><td style="padding: 12px 20px; text-align: right"><a href="Lobby.dc.html" style="font-weight: 600">Join</a></td></tr>
+<tr style="border-top: 1px solid #ECECE6"><td style="padding: 12px 20px; font-family: 'Source Serif 4', Georgia, serif; font-size: 17px">Sourdough → Moon landing</td><td style="padding: 12px 20px">5 clicks max</td><td style="padding: 12px 20px">7 / 10</td><td style="padding: 12px 20px; text-align: right"><a href="Lobby.dc.html" style="font-weight: 600">Join</a></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
