@@ -1,0 +1,687 @@
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+
+// Elements to strip from articles: navboxes, sidebars and categories are not
+// part of the article body under the usual wikirace rules.
+const STRIP_SELECTORS = [
+  'script', 'link', 'meta',
+  '.navbox', '.navbox-styles', '.vertical-navbox', '.sidebar', '.sistersitebox',
+  '.side-box', '.catlinks', '.mw-editsection', '#toc', '.toc', '.mw-empty-elt',
+  '.portalbox', '.noprint.portal', '.authority-control', '.mw-authority-control',
+].join(',');
+
+const STATUS_LABEL = {
+  racing: 'racing',
+  finished: 'finished',
+  out: 'out of clicks',
+  gaveup: 'gave up',
+  dnf: 'did not finish',
+  lobby: 'spectating',
+};
+const STATUS_ICON = { racing: '🏃', out: '🛑', gaveup: '🏳️', dnf: '⌛', lobby: '👀' };
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+let session = null; // { code, playerId, token }
+let state = null;
+let clockOffset = 0;
+let events = null;
+let tickTimer = null;
+let moving = false;
+let localNav = null; // { round, title, clicks } from our latest move response
+let shown = { round: null, title: null }; // article currently on screen
+let loadingTitle = null;
+const articleCache = new Map();
+let prevStatuses = new Map();
+
+// ---- utilities -------------------------------------------------------------
+
+function h(tag, props = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    el.append(c instanceof Node ? c : String(c));
+  }
+  return el;
+}
+
+function normalizeTitle(raw) {
+  let s = String(raw ?? '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  const hash = s.indexOf('#');
+  if (hash >= 0) s = s.slice(0, hash).trim();
+  if (!s) return '';
+  const [first, ...rest] = s;
+  return first.toUpperCase() + rest.join('');
+}
+
+function serverNow() {
+  return Date.now() + clockOffset;
+}
+
+function formatMs(ms) {
+  if (ms == null || ms < 0) ms = 0;
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = String(total % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function formatMsPrecise(ms) {
+  return `${formatMs(ms)}.${Math.floor((ms % 1000) / 100)}`;
+}
+
+function wikiUrl(title) {
+  return `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
+}
+
+let toastTimer;
+function toast(msg, kind = '') {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = `toast ${kind}`;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 3500);
+}
+
+function showError(el, msg) {
+  el.textContent = msg || '';
+  el.hidden = !msg;
+}
+
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+function action(type, extra = {}) {
+  return api('POST', `/api/rooms/${session.code}/action`, {
+    playerId: session.playerId,
+    token: session.token,
+    type,
+    ...extra,
+  });
+}
+
+async function tryAction(type, extra) {
+  try {
+    return await action(type, extra);
+  } catch (err) {
+    toast(err.message, 'error');
+    return null;
+  }
+}
+
+const storage = {
+  name: () => localStorage.getItem('wikirace:name') || '',
+  setName: (n) => localStorage.setItem('wikirace:name', n),
+  creds: (code) => JSON.parse(localStorage.getItem(`wikirace:room:${code}`) || 'null'),
+  setCreds: (c) => localStorage.setItem(`wikirace:room:${c.code}`, JSON.stringify(c)),
+  clearCreds: (code) => localStorage.removeItem(`wikirace:room:${code}`),
+};
+
+// ---- home ------------------------------------------------------------------
+
+function showScreen(id) {
+  $('#home').hidden = id !== 'home';
+  $('#room').hidden = id !== 'room';
+}
+
+function readName() {
+  const name = $('#name-input').value.trim();
+  if (!name) {
+    showError($('#home-error'), 'Enter a name first.');
+    $('#name-input').focus();
+    return null;
+  }
+  storage.setName(name);
+  return name;
+}
+
+async function createRoom() {
+  const name = readName();
+  if (!name) return;
+  try {
+    const creds = await api('POST', '/api/rooms', { name });
+    storage.setCreds(creds);
+    enterRoom(creds);
+  } catch (err) {
+    showError($('#home-error'), err.message);
+  }
+}
+
+async function joinRoom(code, { silent = false } = {}) {
+  code = code.trim().toUpperCase();
+  if (!/^[A-Z]{4}$/.test(code)) {
+    showError($('#home-error'), 'Room codes are 4 letters.');
+    return;
+  }
+  const saved = storage.creds(code);
+  const name = saved ? storage.name() || 'Player' : readName();
+  if (!name) return;
+  try {
+    const creds = await api('POST', `/api/rooms/${code}/join`, {
+      name,
+      playerId: saved?.playerId,
+      token: saved?.token,
+    });
+    storage.setCreds(creds);
+    enterRoom(creds);
+  } catch (err) {
+    if (saved) storage.clearCreds(code);
+    if (!silent) showError($('#home-error'), err.message);
+    else showError($('#home-error'), `Couldn't rejoin room ${code}: ${err.message}`);
+    showScreen('home');
+  }
+}
+
+function goHome(message) {
+  events?.close();
+  events = null;
+  clearInterval(tickTimer);
+  session = state = localNav = null;
+  shown = { round: null, title: null };
+  prevStatuses = new Map();
+  history.replaceState(null, '', '/');
+  showScreen('home');
+  showError($('#home-error'), message);
+}
+
+// ---- room connection -------------------------------------------------------
+
+function enterRoom(creds) {
+  session = creds;
+  history.replaceState(null, '', `/?room=${creds.code}`);
+  $('#room-code').textContent = creds.code;
+  showScreen('room');
+  showError($('#home-error'), '');
+  events?.close();
+  const qs = new URLSearchParams({ pid: creds.playerId, token: creds.token });
+  events = new EventSource(`/api/rooms/${creds.code}/events?${qs}`);
+  events.onmessage = (e) => {
+    const next = JSON.parse(e.data);
+    clockOffset = next.serverNow - Date.now();
+    announce(next);
+    state = next;
+    render();
+  };
+  events.onerror = () => {
+    if (events.readyState === EventSource.CLOSED) {
+      storage.clearCreds(creds.code);
+      goHome(`Room ${creds.code} is no longer available.`);
+    }
+  };
+  clearInterval(tickTimer);
+  tickTimer = setInterval(tick, 200);
+}
+
+function announce(next) {
+  if (state && state.round === next.round) {
+    for (const p of next.players) {
+      const before = prevStatuses.get(p.id);
+      if (before === 'racing' && p.status === 'finished' && p.id !== next.you) {
+        toast(`🎉 ${p.name} reached the target in ${p.clicks} clicks!`);
+      }
+    }
+  }
+  prevStatuses = new Map(next.players.map((p) => [p.id, p.status]));
+}
+
+function me() {
+  return state?.players.find((p) => p.id === state.you);
+}
+
+function isHost() {
+  return state && state.hostId === state.you;
+}
+
+// ---- rendering -------------------------------------------------------------
+
+function render() {
+  if (!state) return;
+  document.body.classList.toggle('is-host', isHost());
+  $('#lobby').hidden = state.state !== 'lobby';
+  $('#race').hidden = state.state !== 'racing';
+  $('#results').hidden = state.state !== 'finished';
+  if (state.state === 'lobby') renderLobby();
+  else if (state.state === 'racing') renderRace();
+  else renderResults();
+}
+
+function renderPlayerList(ul) {
+  ul.replaceChildren(
+    ...state.players.map((p) =>
+      h('li', { class: p.online ? '' : 'offline' },
+        h('span', { class: 'dot', title: p.online ? 'online' : 'offline' }),
+        h('span', { class: 'pname' }, p.name),
+        p.isHost && h('span', { class: 'tag' }, '👑 host'),
+        p.id === state.you && h('span', { class: 'tag you' }, 'you'),
+      ),
+    ),
+  );
+}
+
+function renderTargetSummary(container) {
+  const s = state.targetSummary;
+  if (!state.target) {
+    container.replaceChildren();
+    return;
+  }
+  container.replaceChildren(
+    h('div', { class: 'ts-head' },
+      s?.thumbnail && h('img', { src: s.thumbnail, alt: '' }),
+      h('div', {},
+        h('div', { class: 'muted small-text' }, 'Target'),
+        h('div', { class: 'ts-title' }, state.target),
+      ),
+    ),
+    s?.extract && h('p', { class: 'ts-extract' }, s.extract),
+  );
+}
+
+function renderLobby() {
+  const host = isHost();
+  const hostPlayer = state.players.find((p) => p.isHost);
+  $('#host-hint').textContent = host
+    ? 'You are the host. Pick the pages and rules, then start the race.'
+    : `${hostPlayer?.name ?? 'The host'} is setting up the race.`;
+
+  for (const which of ['start', 'target']) {
+    const input = $(`#${which}-input`);
+    input.disabled = !host;
+    if (document.activeElement !== input) input.value = state[which] || '';
+  }
+  renderTargetSummary($('#target-preview'));
+
+  for (const el of $$('[data-setting]')) {
+    const key = el.dataset.setting;
+    el.disabled = !host;
+    if (document.activeElement === el) continue;
+    if (el.type === 'checkbox') el.checked = Boolean(state.settings[key]);
+    else el.value = state.settings[key];
+  }
+
+  $('#start-btn').disabled = !state.start || !state.target;
+  $('#player-count').textContent = `(${state.players.length})`;
+  renderPlayerList($('#lobby-players'));
+}
+
+function desiredTitle() {
+  const mine = me();
+  if (!mine?.current) return null;
+  if (localNav && localNav.round === state.round && localNav.clicks > mine.clicks) {
+    return localNav.title;
+  }
+  return mine.current;
+}
+
+function renderRace() {
+  const mine = me();
+  const racingStarted = serverNow() >= state.startAt;
+  const participant = mine && mine.status !== 'lobby';
+
+  $('#race-start').textContent = state.start;
+  $('#race-target').textContent = state.target;
+  $('#race-target').title = state.targetSummary?.extract || '';
+  renderTargetSummary($('#target-card'));
+
+  $('#my-clicks').textContent = mine?.clicks ?? 0;
+  $('#click-limit').textContent = state.settings.clickLimit ? ` / ${state.settings.clickLimit}` : '';
+  const racing = mine?.status === 'racing';
+  $('#back-btn').hidden = !(state.settings.allowBack && racing);
+  $('#back-btn').disabled = !mine?.canGoBack || moving;
+  $('#giveup-btn').hidden = !racing;
+
+  // Banner for non-racing states
+  const banner = $('#race-banner');
+  let msg = null;
+  if (!participant) msg = '👀 You joined mid-race, so you are spectating. You will race next round.';
+  else if (mine.status === 'finished')
+    msg = `🎉 You reached ${state.target} in ${mine.clicks} clicks (${formatMsPrecise(mine.finishedMs)})! Waiting for the others…`;
+  else if (mine.status === 'out') msg = '🛑 Out of clicks. Watch the others finish!';
+  else if (mine.status === 'gaveup') msg = '🏳️ You gave up. Watch the others finish!';
+  banner.hidden = !msg;
+  banner.textContent = msg || '';
+  $('#article-wrap').classList.toggle('locked', !racing);
+
+  // Breadcrumbs
+  const path = mine?.path || [];
+  $('#my-path').replaceChildren(
+    ...path.flatMap((t, i) => [i > 0 && h('span', { class: 'sep' }, '›'), h('span', {}, t)]).filter(Boolean),
+  );
+
+  // Standings
+  $('#race-players').replaceChildren(
+    ...state.players.map((p) =>
+      h('li', { class: `${p.status} ${p.online ? '' : 'offline'} ${p.id === state.you ? 'me' : ''}` },
+        h('span', { class: 'place' }, p.place ? MEDALS[p.place - 1] || `#${p.place}` : STATUS_ICON[p.status]),
+        h('div', { class: 'who' },
+          h('div', {},
+            h('b', {}, p.name),
+            p.id === state.you && h('span', { class: 'tag you' }, 'you'),
+          ),
+          h('div', { class: 'muted small-text' },
+            p.status === 'lobby'
+              ? 'spectating'
+              : `${p.clicks} click${p.clicks === 1 ? '' : 's'}` +
+                  (p.finishedMs != null ? ` · ${formatMsPrecise(p.finishedMs)}` : '') +
+                  (p.status !== 'racing' && p.status !== 'finished' ? ` · ${STATUS_LABEL[p.status]}` : ''),
+          ),
+          p.current && p.id !== state.you && p.status === 'racing' &&
+            h('div', { class: 'small-text current' }, `on ${p.current}`),
+        ),
+      ),
+    ),
+  );
+
+  if (participant && racingStarted) ensureArticle();
+  else if (!participant) {
+    $('#article').replaceChildren();
+    shown = { round: null, title: null };
+  }
+  updateClock();
+}
+
+function renderResults() {
+  const participants = state.players.filter((p) => p.status !== 'lobby');
+  const winner = participants.find((p) => p.place === 1);
+  $('#results-title').textContent = winner
+    ? winner.id === state.you
+      ? '🏆 You win!'
+      : `🏆 ${winner.name} wins!`
+    : 'Race over — nobody made it!';
+  $('#results-route').textContent = `${state.start} → ${state.target} · ${
+    state.settings.mode === 'time' ? 'fastest time wins' : 'fewest clicks wins'
+  }`;
+  $('#results-list').replaceChildren(
+    ...participants.map((p) =>
+      h('li', { class: p.status },
+        h('div', { class: 'result-head' },
+          h('span', { class: 'place' }, p.place ? MEDALS[p.place - 1] || `#${p.place}` : STATUS_ICON[p.status]),
+          h('b', {}, p.name),
+          p.id === state.you && h('span', { class: 'tag you' }, 'you'),
+          h('span', { class: 'muted' },
+            `${p.clicks} click${p.clicks === 1 ? '' : 's'}` +
+              (p.finishedMs != null ? ` · ${formatMsPrecise(p.finishedMs)}` : ` · ${STATUS_LABEL[p.status]}`),
+          ),
+        ),
+        h('div', { class: 'result-path' },
+          ...(p.path || []).flatMap((t, i) => [
+            i > 0 && h('span', { class: 'sep' }, '›'),
+            h('a', { href: wikiUrl(t), target: '_blank', rel: 'noopener' }, t),
+          ]),
+        ),
+      ),
+    ),
+  );
+}
+
+function updateClock() {
+  if (!state || state.state !== 'racing') return;
+  const now = serverNow();
+  const mine = me();
+  const countdown = $('#countdown');
+  const remainingStart = state.startAt - now;
+  if (remainingStart > 0) {
+    countdown.hidden = false;
+    countdown.textContent = Math.ceil(remainingStart / 1000);
+  } else {
+    countdown.hidden = true;
+  }
+  let text;
+  if (mine?.finishedMs != null) text = formatMsPrecise(mine.finishedMs);
+  else if (state.endsAt) text = `${formatMs(state.endsAt - now)} left`;
+  else text = formatMs(now - state.startAt);
+  $('#my-timer').textContent = text;
+}
+
+function tick() {
+  if (!state || state.state !== 'racing') return;
+  updateClock();
+  const mine = me();
+  if (mine && mine.status !== 'lobby' && serverNow() >= state.startAt) ensureArticle();
+}
+
+// ---- articles --------------------------------------------------------------
+
+async function fetchArticle(title) {
+  if (articleCache.has(title)) return articleCache.get(title);
+  const data = await api('GET', `/api/article?title=${encodeURIComponent(title)}`);
+  articleCache.set(title, data);
+  if (articleCache.size > 40) articleCache.delete(articleCache.keys().next().value);
+  return data;
+}
+
+async function ensureArticle() {
+  const title = desiredTitle();
+  if (!title) return;
+  if (shown.round === state.round && shown.title === title) return;
+  if (loadingTitle === title) return;
+  loadingTitle = title;
+  $('#article-wrap').classList.add('loading');
+  try {
+    const data = await fetchArticle(title);
+    if (desiredTitle() !== title) return; // superseded
+    renderArticle(data);
+    shown = { round: state.round, title };
+  } catch (err) {
+    toast(`Couldn't load "${title}": ${err.message}`, 'error');
+  } finally {
+    if (loadingTitle === title) loadingTitle = null;
+    $('#article-wrap').classList.remove('loading');
+  }
+}
+
+function renderArticle(data) {
+  const doc = new DOMParser().parseFromString(data.html, 'text/html');
+  const root = doc.body;
+  root.querySelectorAll(STRIP_SELECTORS).forEach((el) => el.remove());
+  for (const el of root.querySelectorAll('*')) {
+    for (const attr of [...el.attributes]) {
+      if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
+    }
+  }
+
+  const links = new Set(data.links);
+  for (const a of root.querySelectorAll('a')) {
+    const href = a.getAttribute('href') || '';
+    if (href.startsWith('#')) continue; // footnotes and in-page anchors
+    const m = href.match(/^\/wiki\/([^?#]+)/);
+    let title = null;
+    if (m) {
+      try {
+        title = normalizeTitle(decodeURIComponent(m[1]));
+      } catch {
+        title = null;
+      }
+    }
+    if (title && links.has(title) && title !== data.title) {
+      a.classList.add('game-link');
+      a.dataset.title = title;
+      a.setAttribute('href', '#');
+    } else {
+      a.classList.add('dead-link');
+      a.removeAttribute('href');
+    }
+  }
+  // Protocol-relative image URLs break under file:// and some proxies.
+  for (const img of root.querySelectorAll('img')) {
+    const src = img.getAttribute('src');
+    if (src?.startsWith('//')) img.setAttribute('src', `https:${src}`);
+    img.removeAttribute('srcset');
+    img.setAttribute('loading', 'lazy');
+  }
+
+  const titleEl = h('h1', { class: 'article-title' });
+  titleEl.textContent = new DOMParser().parseFromString(data.displayTitle, 'text/html').body.textContent;
+  const body = h('div', { class: 'article-body' });
+  body.append(...root.childNodes);
+  $('#article').replaceChildren(titleEl, body);
+  $('#article-wrap').scrollTop = 0;
+  window.scrollTo({ top: 0 });
+}
+
+async function clickLink(title) {
+  const mine = me();
+  if (moving || mine?.status !== 'racing') return;
+  moving = true;
+  $('#article-wrap').classList.add('loading');
+  try {
+    const res = await action('move', { title });
+    localNav = { round: res.round, title: res.title, clicks: res.clicks };
+    // Preload while we wait for the state broadcast.
+    await ensureArticle();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    moving = false;
+    $('#article-wrap').classList.remove('loading');
+    render();
+  }
+}
+
+async function goBack() {
+  if (moving) return;
+  moving = true;
+  try {
+    const res = await action('back');
+    localNav = { round: res.round, title: res.title, clicks: res.clicks };
+    await ensureArticle();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    moving = false;
+    render();
+  }
+}
+
+// ---- wiring ----------------------------------------------------------------
+
+function bind() {
+  $('#name-input').value = storage.name();
+  $('#create-btn').onclick = createRoom;
+  $('#join-btn').onclick = () => joinRoom($('#code-input').value);
+  $('#code-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') joinRoom($('#code-input').value);
+  });
+  $('#code-input').addEventListener('input', (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+  });
+  $('#name-input').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if ($('#code-input').value.length === 4) joinRoom($('#code-input').value);
+    else createRoom();
+  });
+
+  $('#copy-link').onclick = async () => {
+    const link = `${location.origin}/?room=${session.code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast('Invite link copied!');
+    } catch {
+      toast(link);
+    }
+  };
+  $('#leave-btn').onclick = async () => {
+    if (!confirm('Leave this room?')) return;
+    await tryAction('leave');
+    storage.clearCreds(session.code);
+    goHome();
+  };
+
+  for (const which of ['start', 'target']) {
+    const input = $(`#${which}-input`);
+    const commit = async () => {
+      const title = input.value.trim();
+      if (!title || title === state?.[which]) return;
+      input.classList.add('busy');
+      showError($('#lobby-error'), '');
+      try {
+        await action('setPage', { which, title });
+      } catch (err) {
+        showError($('#lobby-error'), err.message);
+        input.value = state?.[which] || '';
+      } finally {
+        input.classList.remove('busy');
+      }
+    };
+    input.addEventListener('change', commit);
+    input.addEventListener('keydown', (e) => e.key === 'Enter' && input.blur());
+  }
+
+  for (const btn of $$('[data-random]')) {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      showError($('#lobby-error'), '');
+      try {
+        await action('random', { which: btn.dataset.random });
+      } catch (err) {
+        showError($('#lobby-error'), err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  }
+
+  for (const el of $$('[data-setting]')) {
+    el.addEventListener('change', () => {
+      const key = el.dataset.setting;
+      const value = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value;
+      tryAction('settings', { settings: { [key]: value } });
+    });
+  }
+
+  $('#start-btn').onclick = async () => {
+    showError($('#lobby-error'), '');
+    try {
+      await action('start');
+    } catch (err) {
+      showError($('#lobby-error'), err.message);
+    }
+  };
+
+  $('#article').addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    if (a.classList.contains('game-link')) {
+      e.preventDefault();
+      clickLink(a.dataset.title);
+    } else if (!(a.getAttribute('href') || '').startsWith('#')) {
+      e.preventDefault();
+    }
+  });
+  $('#back-btn').onclick = goBack;
+  $('#giveup-btn').onclick = () => confirm('Give up this race?') && tryAction('giveUp');
+  $('#end-btn').onclick = () => confirm('End the race for everyone?') && tryAction('end');
+  $('#to-lobby-btn').onclick = () => tryAction('lobby');
+  $('#rematch-btn').onclick = async () => {
+    if (await tryAction('lobby')) await tryAction('random', { which: 'both' });
+  };
+}
+
+function boot() {
+  bind();
+  const code = new URLSearchParams(location.search).get('room')?.toUpperCase();
+  if (code && /^[A-Z]{4}$/.test(code)) {
+    $('#code-input').value = code;
+    if (storage.creds(code)) {
+      joinRoom(code, { silent: true });
+      return;
+    }
+    (storage.name() ? $('#join-btn') : $('#name-input')).focus();
+  }
+  showScreen('home');
+}
+
+boot();
