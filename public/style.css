@@ -296,3 +296,31 @@ body.is-host .guest-only { display: none !important; }
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 .toast.error { background: var(--bad); }
+
+/* ---- find-in-page protection (see hideTextFromFind in app.js) ---- */
+.nf::before { content: attr(data-t); }
+#article:has(.nf) { user-select: none; -webkit-user-select: none; }
+
+/* ---- page picker autocomplete ---- */
+.ac { position: relative; flex: 1; display: flex; }
+.ac input { flex: 1; }
+.ac-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.3em 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 20;
+}
+.ac-list li { padding: 0.45em 0.9em; cursor: pointer; display: flex; flex-direction: column; }
+.ac-list li.active, .ac-list li:hover { background: #eef2ff; }
+.ac-title { font-weight: 600; }
+.ac-desc { font-size: 0.85em; color: var(--muted); }
+.suggestions { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
+.suggestions button { font-weight: 500; color: var(--text); }

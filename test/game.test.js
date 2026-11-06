@@ -11,7 +11,10 @@ const GRAPH = {
   France: ['Napoleon', 'Paris'],
   Paris: ['France'],
   Napoleon: ['France'],
+  'New York': ['New York City', 'New York (state)'],
+  'New York City': ['France'],
 };
+const DISAMBIGUATION = new Set(['New York']);
 const REDIRECTS = { USA: 'United States' };
 
 function fakeWiki() {
@@ -20,10 +23,22 @@ function fakeWiki() {
       const key = normalizeTitle(raw);
       const title = REDIRECTS[key] || key;
       if (!GRAPH[title]) throw Object.assign(new Error(`No article ${title}`), { status: 404 });
-      return { title, displayTitle: title, html: '', links: new Set(GRAPH[title]), linkList: GRAPH[title] };
+      return {
+        title,
+        displayTitle: title,
+        disambiguation: DISAMBIGUATION.has(title),
+        html: '',
+        links: new Set(GRAPH[title]),
+        linkList: GRAPH[title],
+      };
     },
     async getSummary(title) {
       return { title, extract: '', thumbnail: null };
+    },
+    async search(q) {
+      return Object.keys(GRAPH)
+        .filter((t) => t.startsWith(q))
+        .map((title) => ({ title, description: '', disambiguation: DISAMBIGUATION.has(title) }));
     },
     async randomTitle() {
       return 'Paris';
@@ -189,4 +204,16 @@ test('concurrent double-click only counts once', async () => {
   const results = await Promise.allSettled([room.move(a.id, 'France'), room.move(a.id, 'Cucumber')]);
   assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(a.clicks, 1);
+});
+
+test('disambiguation pages are rejected with suggestions', async () => {
+  const { room, host } = setup();
+  await assert.rejects(room.setPage(host.id, 'target', 'new York'), (err) => {
+    assert.match(err.message, /disambiguation/);
+    assert.deepEqual(err.suggestions.map((s) => s.title), ['New York City']);
+    return true;
+  });
+  assert.equal(room.target, null);
+  await room.setPage(host.id, 'target', 'New York City');
+  assert.equal(room.target, 'New York City');
 });

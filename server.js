@@ -160,6 +160,10 @@ async function route(req, res) {
   const { pathname } = url;
 
   if (req.method === 'GET' && pathname === '/api/article') return handleArticle(req, res, url);
+  if (req.method === 'GET' && pathname === '/api/search') {
+    const results = await wiki.search(url.searchParams.get('q'));
+    return send(req, res, 200, { results }, { 'Cache-Control': 'public, max-age=3600' });
+  }
 
   if (req.method === 'POST' && pathname === '/api/rooms') {
     const body = await readJson(req);
@@ -208,7 +212,9 @@ const server = http.createServer(async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error(err);
-    if (!res.headersSent) send(req, res, status, { error: err.message || 'Server error' });
+    if (!res.headersSent) {
+      send(req, res, status, { error: err.message || 'Server error', suggestions: err.suggestions });
+    }
     else res.end();
   }
 });
