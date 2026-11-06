@@ -2,24 +2,10 @@
 
 A multiplayer **WikiRace**. Everyone starts on the same Wikipedia article and races to the same target using only the links inside the article body.
 
-## Run it
+## Where to play
 
-```bash
-npm start          # http://localhost:3000  (PORT=8080 npm start to change)
-npm test
-```
-
-You need Node 18 or newer. There are no dependencies to install. Locally, rooms are kept in memory unless Redis credentials are set (see below).
-
-To play with friends on the same network, share `http://<your-ip>:3000/?room=CODE`.
-
-## Deploy to Vercel
-
-1. Import the repo in Vercel (or run `vercel link`). `vercel.json` serves `public/` from the CDN and sends every `/api/*` request to `api/index.js`.
-2. Add Upstash Redis from the Vercel Marketplace (Storage → Upstash → Redis, free plan) and connect it to the project. This sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` work too.
-3. Deploy. To run locally against the same Redis, use `vercel env pull .env.local`, then `node --env-file=.env.local server.js`.
-
-Without Redis, a deployment falls back to in-memory rooms. Those break as soon as Vercel runs more than one instance.
+wikirace.vedantmodi.com
+wikirace.hannahjiang.com
 
 ## How it plays
 
