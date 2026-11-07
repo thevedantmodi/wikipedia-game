@@ -906,6 +906,21 @@ body.is-host .guest-only { display: none !important; }
 }
 .toast.error { background: var(--bad); color: var(--on-primary); }
 
+/* ---- confirm dialog ---- */
+.confirm-dialog {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.4em 1.5em 1.2em;
+  width: min(380px, 90vw);
+}
+.confirm-dialog::backdrop { background: var(--overlay); }
+.confirm-message { margin: 0 0 1.2em; font-size: 1.05em; font-weight: 500; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 0.6em; }
+.confirm-actions button.danger { background: var(--bad); border-color: var(--bad); color: var(--on-primary); }
+
 /* ---- theme toggle ---- */
 .theme-toggle {
   display: inline-grid;

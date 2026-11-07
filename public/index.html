@@ -251,6 +251,15 @@
   </section>
 
   <div id="alerts" class="alerts" aria-live="polite"></div>
+  <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-message">
+    <form method="dialog">
+      <p id="confirm-message" class="confirm-message"></p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" class="ghost" value="cancel">Cancel</button>
+        <button id="confirm-ok" class="primary" value="ok">OK</button>
+      </div>
+    </form>
+  </dialog>
   <div id="toast" class="toast" hidden></div>
   <script type="module" src="/app.js"></script>
 </body>

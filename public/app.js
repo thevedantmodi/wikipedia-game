@@ -90,6 +90,33 @@ function toast(msg, kind = '') {
   toastTimer = setTimeout(() => (el.hidden = true), 3500);
 }
 
+// In-page replacement for window.confirm(). Resolves true on OK, false on
+// Cancel / Escape / backdrop click.
+function confirmDialog(message, okLabel = 'OK') {
+  const dlg = $('#confirm-dialog');
+  $('#confirm-message').textContent = message;
+  const ok = $('#confirm-ok');
+  ok.textContent = okLabel;
+  ok.classList.add('danger');
+  return new Promise((resolve) => {
+    const onClick = (e) => {
+      if (e.target === dlg) dlg.close('cancel'); // backdrop
+    };
+    dlg.addEventListener('click', onClick);
+    dlg.addEventListener(
+      'close',
+      () => {
+        dlg.removeEventListener('click', onClick);
+        resolve(dlg.returnValue === 'ok');
+      },
+      { once: true },
+    );
+    dlg.returnValue = '';
+    dlg.showModal();
+    $('#confirm-cancel').focus();
+  });
+}
+
 function showError(el, msg) {
   el.textContent = msg || '';
   el.hidden = !msg;
@@ -988,8 +1015,10 @@ function bindSiteSwitch() {
       a.setAttribute('aria-current', 'page');
       a.addEventListener('click', (e) => e.preventDefault());
     } else {
-      a.addEventListener('click', (e) => {
-        if (me()?.status === 'racing' && !confirm('Leave this race for the other site?')) e.preventDefault();
+      a.addEventListener('click', async (e) => {
+        if (me()?.status !== 'racing') return;
+        e.preventDefault();
+        if (await confirmDialog('Leave this race for the other site?', 'Leave')) location.href = a.href;
       });
     }
   }
@@ -1023,7 +1052,7 @@ function bind() {
     }
   };
   $('#leave-btn').onclick = async () => {
-    if (!confirm('Leave this room?')) return;
+    if (!(await confirmDialog('Leave this room?', 'Leave'))) return;
     await tryAction('leave');
     storage.clearCreds(session.code);
     goHome();
@@ -1073,8 +1102,12 @@ function bind() {
     }
   });
   $('#back-btn').onclick = goBack;
-  $('#giveup-btn').onclick = () => confirm('Give up this race?') && tryAction('giveUp');
-  $('#end-btn').onclick = () => confirm('End the race for everyone?') && tryAction('end');
+  $('#giveup-btn').onclick = async () => {
+    if (await confirmDialog('Give up this race?', 'Give up')) tryAction('giveUp');
+  };
+  $('#end-btn').onclick = async () => {
+    if (await confirmDialog('End the race for everyone?', 'End race')) tryAction('end');
+  };
   $('#help-btn').onclick = () => ($('#help-panel').hidden ? openHelp() : closeHelp());
   $('#help-close').onclick = closeHelp;
   $('#hint-btn').onclick = () => {
